@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../services/session_controller.dart';
 import 'leaderboard_screen.dart';
+import 'predictions_screen.dart';
 import 'profile_screen.dart';
 
 class MainShell extends StatefulWidget {
@@ -20,6 +21,7 @@ class _MainShellState extends State<MainShell> {
   Widget build(BuildContext context) {
     final pages = [
       ProfileScreen(sessionController: widget.sessionController),
+      PredictionsScreen(sessionController: widget.sessionController),
       LeaderboardScreen(sessionController: widget.sessionController),
     ];
 
@@ -34,6 +36,11 @@ class _MainShellState extends State<MainShell> {
             icon: Icon(Icons.person_outline),
             selectedIcon: Icon(Icons.person),
             label: 'Perfil',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.fact_check_outlined),
+            selectedIcon: Icon(Icons.fact_check),
+            label: 'Palpites',
           ),
           NavigationDestination(
             icon: Icon(Icons.leaderboard_outlined),

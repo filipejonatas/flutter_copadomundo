@@ -26,7 +26,7 @@ class LeaderboardScreen extends StatelessWidget {
             Text('Classificacao geral', style: theme.textTheme.headlineMedium),
             const SizedBox(height: 8),
             Text(
-              'Ranking mockado para validar o fluxo antes de conectar Firestore e a API externa de resultados.',
+              'Ranking mockado para validar o fluxo antes de conectar resultados oficiais da API externa.',
               style: theme.textTheme.bodyMedium,
             ),
             const SizedBox(height: 20),
