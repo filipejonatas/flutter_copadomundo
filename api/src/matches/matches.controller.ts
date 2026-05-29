@@ -7,7 +7,7 @@ export class MatchesController {
   constructor(private readonly matchesService: MatchesService) {}
 
   @Get('world-cup-2026')
-  getWorldCup2026Matches(): WorldCupMatch[] {
+  getWorldCup2026Matches(): Promise<WorldCupMatch[]> {
     return this.matchesService.getWorldCup2026Matches();
   }
 }
