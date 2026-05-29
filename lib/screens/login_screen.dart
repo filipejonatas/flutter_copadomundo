@@ -66,8 +66,18 @@ class LoginScreen extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 16),
+                  if (sessionController.errorMessage != null) ...[
+                    Text(
+                      sessionController.errorMessage!,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.error,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 16),
+                  ],
                   Text(
-                    'Nesta etapa o login esta mockado; depois ligamos Firebase Auth e Google Sign-In.',
+                    'Login protegido por Firebase Auth e Google Sign-In.',
                     style: theme.textTheme.bodyMedium,
                     textAlign: TextAlign.center,
                   ),

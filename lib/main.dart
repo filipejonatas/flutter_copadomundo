@@ -1,13 +1,18 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 
+import 'firebase_options.dart';
 import 'models/app_user.dart';
 import 'models/leaderboard_entry.dart';
 import 'screens/login_screen.dart';
 import 'screens/main_shell.dart';
 import 'services/session_controller.dart';
 
-void main() {
-  runApp(CopaPalpiteApp(sessionController: MockSessionController()));
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
+  runApp(CopaPalpiteApp(sessionController: FirebaseSessionController()));
 }
 
 class CopaPalpiteApp extends StatelessWidget {

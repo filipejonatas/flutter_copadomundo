@@ -1,0 +1,54 @@
+{
+  "project_info": {
+    "project_number": "486509842743",
+    "project_id": "copa-palpite",
+    "storage_bucket": "copa-palpite.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:486509842743:android:9a0e1677a1c8367f490ab2",
+        "android_client_info": {
+          "package_name": "com.copapalpite.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "486509842743-isocuh93mki305jf7ne9sotm4ib5c9ol.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.copapalpite.app",
+            "certificate_hash": "3b4cf2f7d793a29e0778ae1fe0a7e13f06abaed5"
+          }
+        },
+        {
+          "client_id": "486509842743-5n99liug99kofnifvu06a1n837me6pdt.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA-D19dn_Sb0UW2KQXcGNPLznW8jZlttUI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "486509842743-5n99liug99kofnifvu06a1n837me6pdt.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "486509842743-1bsb06e0fbe9i1hsijmumfia0648cl2d.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.copapalpite.app"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

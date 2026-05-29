@@ -1,4 +1,4 @@
-package com.example.copa_palpite
+package com.copapalpite.app
 
 import io.flutter.embedding.android.FlutterActivity
 
