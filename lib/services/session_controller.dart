@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
@@ -17,18 +18,24 @@ abstract class SessionController extends ChangeNotifier {
 }
 
 class FirebaseSessionController extends SessionController {
-  FirebaseSessionController({FirebaseAuth? firebaseAuth})
-    : _firebaseAuth = firebaseAuth ?? FirebaseAuth.instance {
-    _authSubscription = _firebaseAuth.userChanges().listen(_syncFirebaseUser);
+  FirebaseSessionController({
+    FirebaseAuth? firebaseAuth,
+    FirebaseDatabase? database,
+  }) : _firebaseAuth = firebaseAuth ?? FirebaseAuth.instance,
+       _database = database ?? FirebaseDatabase.instance {
+    _authSubscription = _firebaseAuth.userChanges().listen(
+      (user) => unawaited(_syncFirebaseUser(user)),
+    );
     unawaited(GoogleSignIn.instance.initialize());
   }
 
   final FirebaseAuth _firebaseAuth;
+  final FirebaseDatabase _database;
   StreamSubscription<User?>? _authSubscription;
   AppUser? _currentUser;
   bool _isLoading = false;
   String? _errorMessage;
-  String _avatarId = 'star';
+  int _authSyncVersion = 0;
 
   @override
   AppUser? get currentUser => _currentUser;
@@ -82,17 +89,31 @@ class FirebaseSessionController extends SessionController {
     required String avatarId,
   }) async {
     final firebaseUser = _firebaseAuth.currentUser;
-    if (firebaseUser == null) return;
+    if (firebaseUser == null) {
+      _errorMessage = 'Entre novamente para salvar o perfil.';
+      notifyListeners();
+      return;
+    }
 
     _setLoading(true);
     _errorMessage = null;
 
     try {
       await firebaseUser.updateDisplayName(nick.trim());
-      await firebaseUser.reload();
-      _avatarId = avatarId;
-      _syncFirebaseUser(_firebaseAuth.currentUser);
-    } on FirebaseAuthException catch (error) {
+      await _userReference(firebaseUser.uid).update({
+        'nick': nick.trim(),
+        'avatarId': avatarId,
+        'email': firebaseUser.email ?? '',
+        'displayName': firebaseUser.displayName ?? nick.trim(),
+        'updatedAt': ServerValue.timestamp,
+      });
+      _currentUser = _currentUser?.copyWith(
+        displayName: nick.trim(),
+        nick: nick.trim(),
+        avatarId: avatarId,
+      );
+      notifyListeners();
+    } on FirebaseException catch (error) {
       _errorMessage = error.message ?? 'Nao foi possivel salvar o perfil.';
     } catch (_) {
       _errorMessage = 'Nao foi possivel salvar o perfil.';
@@ -103,12 +124,18 @@ class FirebaseSessionController extends SessionController {
 
   @override
   Future<void> signOut() async {
+    _authSyncVersion++;
+    _currentUser = null;
     _setLoading(true);
     _errorMessage = null;
 
     try {
-      await GoogleSignIn.instance.signOut();
       await _firebaseAuth.signOut();
+      if (!kIsWeb) {
+        await GoogleSignIn.instance.signOut();
+      }
+    } catch (_) {
+      _errorMessage = 'Nao foi possivel sair. Tente novamente.';
     } finally {
       _currentUser = null;
       _setLoading(false);
@@ -121,9 +148,31 @@ class FirebaseSessionController extends SessionController {
     super.dispose();
   }
 
-  void _syncFirebaseUser(User? user) {
-    _currentUser = user == null ? null : _mapFirebaseUser(user);
+  Future<void> _syncFirebaseUser(User? user) async {
+    final syncVersion = ++_authSyncVersion;
+
+    if (user == null) {
+      _currentUser = null;
+      notifyListeners();
+      return;
+    }
+
+    _currentUser = _mapFirebaseUser(user);
     notifyListeners();
+
+    try {
+      final profile = await _loadOrCreateUserProfile(user);
+      if (syncVersion != _authSyncVersion ||
+          _firebaseAuth.currentUser?.uid != user.uid) {
+        return;
+      }
+      _currentUser = profile;
+      _errorMessage = null;
+      notifyListeners();
+    } catch (_) {
+      _errorMessage = 'Nao foi possivel carregar seu perfil salvo.';
+      notifyListeners();
+    }
   }
 
   AppUser _mapFirebaseUser(User user) {
@@ -136,8 +185,43 @@ class FirebaseSessionController extends SessionController {
       email: user.email ?? '',
       displayName: user.displayName ?? fallbackNick,
       nick: fallbackNick,
-      avatarId: _avatarId,
+      avatarId: 'star',
     );
+  }
+
+  Future<AppUser> _loadOrCreateUserProfile(User user) async {
+    final fallback = _mapFirebaseUser(user);
+    final reference = _userReference(user.uid);
+    final snapshot = await reference.get();
+
+    if (!snapshot.exists) {
+      await reference.set({
+        'nick': fallback.nick,
+        'avatarId': fallback.avatarId,
+        'email': fallback.email,
+        'displayName': fallback.displayName,
+        'createdAt': ServerValue.timestamp,
+        'updatedAt': ServerValue.timestamp,
+      });
+      return fallback;
+    }
+
+    final rawData = snapshot.value;
+    final data = rawData is Map
+        ? Map<String, dynamic>.from(rawData)
+        : <String, dynamic>{};
+    return fallback.copyWith(
+      nick: (data['nick'] as String?)?.trim().isNotEmpty == true
+          ? (data['nick'] as String).trim()
+          : fallback.nick,
+      avatarId: (data['avatarId'] as String?)?.trim().isNotEmpty == true
+          ? (data['avatarId'] as String).trim()
+          : fallback.avatarId,
+    );
+  }
+
+  DatabaseReference _userReference(String uid) {
+    return _database.ref('users/$uid');
   }
 
   void _setLoading(bool value) {

@@ -52,6 +52,7 @@ class DefaultFirebaseOptions {
     messagingSenderId: '486509842743',
     projectId: 'copa-palpite',
     authDomain: 'copa-palpite.firebaseapp.com',
+    databaseURL: 'https://copa-palpite-default-rtdb.firebaseio.com',
     storageBucket: 'copa-palpite.firebasestorage.app',
     measurementId: 'G-527LK0S5T1',
   );
@@ -61,6 +62,7 @@ class DefaultFirebaseOptions {
     appId: '1:486509842743:android:9a0e1677a1c8367f490ab2',
     messagingSenderId: '486509842743',
     projectId: 'copa-palpite',
+    databaseURL: 'https://copa-palpite-default-rtdb.firebaseio.com',
     storageBucket: 'copa-palpite.firebasestorage.app',
   );
 
@@ -69,6 +71,7 @@ class DefaultFirebaseOptions {
     appId: '1:486509842743:ios:73d36818527f9ac6490ab2',
     messagingSenderId: '486509842743',
     projectId: 'copa-palpite',
+    databaseURL: 'https://copa-palpite-default-rtdb.firebaseio.com',
     storageBucket: 'copa-palpite.firebasestorage.app',
     androidClientId:
         '486509842743-isocuh93mki305jf7ne9sotm4ib5c9ol.apps.googleusercontent.com',

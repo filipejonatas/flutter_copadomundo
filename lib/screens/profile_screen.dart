@@ -41,10 +41,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
       appBar: AppBar(
         title: const Text('Meu perfil'),
         actions: [
-          IconButton(
-            tooltip: 'Sair',
-            onPressed: widget.sessionController.signOut,
-            icon: const Icon(Icons.logout),
+          Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: TextButton.icon(
+              style: TextButton.styleFrom(
+                foregroundColor: theme.colorScheme.primary,
+              ),
+              icon: const Icon(Icons.logout),
+              label: const Text('Sair'),
+              onPressed: widget.sessionController.isLoading
+                  ? null
+                  : widget.sessionController.signOut,
+            ),
           ),
         ],
       ),
@@ -124,6 +132,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
 
     if (!mounted) return;
+    if (widget.sessionController.errorMessage != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(widget.sessionController.errorMessage!)),
+      );
+      return;
+    }
+
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(const SnackBar(content: Text('Perfil atualizado.')));

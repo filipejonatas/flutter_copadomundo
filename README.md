@@ -1,6 +1,32 @@
-# copa_palpite
+# Copa Palpite
 
-A new Flutter project.
+Projeto Flutter para palpites da Copa do Mundo com login Firebase/Google.
+
+## Rodar no navegador
+
+No Windows, use:
+
+```powershell
+.\scripts\run-web.bat
+```
+
+Depois abra:
+
+```text
+http://127.0.0.1:4200
+```
+
+Alternativa usando `localhost`:
+
+```powershell
+.\scripts\run-web-localhost.bat
+```
+
+Depois abra:
+
+```text
+http://localhost:4200
+```
 
 ## Getting Started
 
