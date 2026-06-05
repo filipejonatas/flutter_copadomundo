@@ -7,12 +7,53 @@ export class MatchesService {
   constructor(private readonly configService: ConfigService) {}
 
   async getWorldCup2026Matches(): Promise<WorldCupMatch[]> {
-    const apiKey = this.configService.get<string>('API_FOOTBALL_KEY');
+    // Prefer WC2026 API key; fall back to legacy API_FOOTBALL key for compatibility
+    const wcKey = this.configService.get<string>('WC2026_API_KEY');
+    const fallbackKey = this.configService.get<string>('API_FOOTBALL_KEY');
 
-    if (!apiKey || apiKey === 'coloque_sua_chave_aqui') {
+    // If neither key is configured, return mock data
+    if ((!wcKey || wcKey === 'coloque_sua_chave_aqui') && (!fallbackKey || fallbackKey === 'coloque_sua_chave_aqui')) {
       return this.getMockWorldCup2026Matches();
     }
 
+    if (wcKey) {
+      const baseUrl = this.configService.get<string>('WC2026_BASE_URL') ?? 'https://api.wc2026api.com';
+      const url = new URL('/matches', baseUrl);
+
+      // Optionally filter season/round via query params in the future
+      const response = await fetch(url, {
+        headers: {
+          Authorization: `Bearer ${wcKey}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`WC2026 API respondeu status ${response.status}`);
+      }
+
+      const payload = (await response.json()) as Wc2026MatchesResponse;
+      if (!Array.isArray(payload)) {
+        // If API returns an object with `data` or similar, try to adapt
+        // but fall back to mock data if format is unexpected
+        return this.getMockWorldCup2026Matches();
+      }
+
+      return payload.map((m) => {
+        const kickoff = m.kickoff_utc ?? m.kickoff ?? new Date().toISOString();
+        return {
+          fixtureId: m.id ?? m.match_number ?? 0,
+          round: (m.round ?? '') + (m.group_name ? ` - ${m.group_name}` : ''),
+          kickoffLabel: this.formatKickoffLabel(kickoff),
+          kickoffAt: kickoff,
+          homeTeam: m.home_team ?? '',
+          awayTeam: m.away_team ?? '',
+          status: m.phase ?? m.status ?? '',
+        } as WorldCupMatch;
+      });
+    }
+
+    // Legacy API-Football fallback (unchanged behavior)
+    const apiKey = fallbackKey as string;
     const baseUrl =
       this.configService.get<string>('API_FOOTBALL_BASE_URL') ??
       'https://v3.football.api-sports.io';
@@ -129,3 +170,20 @@ interface ApiFootballFixture {
     };
   };
 }
+
+// Types for WC2026 API responses
+interface Wc2026Match {
+  id?: number;
+  match_number?: number;
+  round?: string;
+  group_name?: string;
+  home_team?: string;
+  away_team?: string;
+  stadium?: string;
+  kickoff_utc?: string;
+  kickoff?: string;
+  status?: string;
+  phase?: string;
+}
+
+type Wc2026MatchesResponse = Wc2026Match[];

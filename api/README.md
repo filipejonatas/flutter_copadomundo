@@ -14,21 +14,13 @@ Endpoint inicial:
 
 ```text
 GET http://127.0.0.1:3000/matches/world-cup-2026
-```
+``` 
 
-## API-Football
+## WC2026 API
 
-Para Copa do Mundo 2026, a API-Football usa:
+Também é possível usar a API dedicada ao World Cup 2026 em https://api.wc2026api.com/. Para ativar use as variáveis de ambiente:
 
-```text
-league=1
-season=2026
-```
+- `WC2026_BASE_URL` (opcional) — padrão `https://api.wc2026api.com`
+- `WC2026_API_KEY` — chave Bearer fornecida pelo serviço
 
-Endpoint que sera usado depois:
-
-```text
-GET https://v3.football.api-sports.io/fixtures?league=1&season=2026
-```
-
-A chave da API deve ficar somente neste backend, em `API_FOOTBALL_KEY`.
+Quando `WC2026_API_KEY` estiver presente o backend usará esse serviço (com fallback para `API_FOOTBALL_KEY`).

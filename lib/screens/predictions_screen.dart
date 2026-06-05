@@ -46,7 +46,7 @@ class _PredictionsScreenState extends State<PredictionsScreen> {
             Text('Registrar palpites', style: theme.textTheme.headlineMedium),
             const SizedBox(height: 8),
             Text(
-              'Escolha vencedor ou empate antes da bola rolar.',
+              'Escolha o vencedor ou empate antes da bola rolar.',
               style: theme.textTheme.bodyMedium,
             ),
             const SizedBox(height: 20),
@@ -60,10 +60,11 @@ class _PredictionsScreenState extends State<PredictionsScreen> {
             else
               for (final match in _matches) ...[
                 _PredictionCard(
+                  key: ValueKey(match.fixtureId),
                   match: match,
                   selectedPick: _picks[match.fixtureId],
                   isSaving: _savingFixtureId == match.fixtureId,
-                  onPickSelected: (pick) => _savePrediction(match, pick),
+                  onSave: (pick) => _savePrediction(match, pick),
                 ),
                 const SizedBox(height: 12),
               ],
@@ -106,7 +107,6 @@ class _PredictionsScreenState extends State<PredictionsScreen> {
 
     setState(() {
       _savingFixtureId = match.fixtureId;
-      _picks[match.fixtureId] = pick;
     });
 
     try {
@@ -116,6 +116,9 @@ class _PredictionsScreenState extends State<PredictionsScreen> {
         pick: pick,
       );
       if (!mounted) return;
+      setState(() {
+        _picks[match.fixtureId] = pick;
+      });
       _showMessage('Palpite salvo.');
     } catch (_) {
       if (!mounted) return;
@@ -134,18 +137,41 @@ class _PredictionsScreenState extends State<PredictionsScreen> {
   }
 }
 
-class _PredictionCard extends StatelessWidget {
+class _PredictionCard extends StatefulWidget {
   const _PredictionCard({
+    super.key,
     required this.match,
     required this.selectedPick,
     required this.isSaving,
-    required this.onPickSelected,
+    required this.onSave,
   });
 
   final MatchPrediction match;
   final MatchPick? selectedPick;
   final bool isSaving;
-  final ValueChanged<MatchPick> onPickSelected;
+  final ValueChanged<MatchPick> onSave;
+
+  @override
+  State<_PredictionCard> createState() => _PredictionCardState();
+}
+
+class _PredictionCardState extends State<_PredictionCard> {
+  MatchPick? _draftPick;
+
+  @override
+  void initState() {
+    super.initState();
+    _draftPick = widget.selectedPick;
+  }
+
+  @override
+  void didUpdateWidget(covariant _PredictionCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.match.fixtureId != widget.match.fixtureId ||
+        oldWidget.selectedPick != widget.selectedPick) {
+      _draftPick = widget.selectedPick;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -160,27 +186,34 @@ class _PredictionCard extends StatelessWidget {
             Row(
               children: [
                 Expanded(
-                  child: Text(match.round, style: theme.textTheme.titleMedium),
+                  child: Text(
+                    widget.match.round,
+                    style: theme.textTheme.titleMedium,
+                  ),
                 ),
-                Text(match.kickoffLabel, style: theme.textTheme.bodyMedium),
+                Text(
+                  widget.match.kickoffLabel,
+                  style: theme.textTheme.bodyMedium,
+                ),
               ],
             ),
             const SizedBox(height: 12),
             Text(
-              '${match.homeTeam} x ${match.awayTeam}',
+              '${widget.match.homeTeam} x ${widget.match.awayTeam}',
               style: theme.textTheme.titleLarge,
             ),
             const SizedBox(height: 4),
             Text(
-              'Status API-Football: ${match.status}',
+              'Status: ${widget.match.status}',
               style: theme.textTheme.bodyMedium,
             ),
             const SizedBox(height: 14),
             SegmentedButton<MatchPick>(
+              emptySelectionAllowed: true,
               segments: [
                 ButtonSegment(
                   value: MatchPick.home,
-                  label: Text(match.homeTeam),
+                  label: Text(widget.match.homeTeam),
                   icon: const Icon(Icons.home),
                 ),
                 const ButtonSegment(
@@ -190,16 +223,38 @@ class _PredictionCard extends StatelessWidget {
                 ),
                 ButtonSegment(
                   value: MatchPick.away,
-                  label: Text(match.awayTeam),
+                  label: Text(widget.match.awayTeam),
                   icon: const Icon(Icons.flight_takeoff),
                 ),
               ],
-              selected: selectedPick == null ? {} : {selectedPick!},
-              onSelectionChanged: isSaving
+              selected: _draftPick == null ? {} : {_draftPick!},
+              onSelectionChanged: widget.isSaving
                   ? null
-                  : (selection) => onPickSelected(selection.first),
+                  : (selection) {
+                      setState(() {
+                        _draftPick = selection.isEmpty ? null : selection.first;
+                      });
+                    },
             ),
-            if (isSaving) ...[
+            const SizedBox(height: 12),
+            Align(
+              alignment: Alignment.centerRight,
+              child: FilledButton.icon(
+                onPressed: widget.isSaving || _draftPick == null
+                    ? null
+                    : () => widget.onSave(_draftPick!),
+                icon: const Icon(Icons.save),
+                label: const Text('Salvar'),
+              ),
+            ),
+            if (widget.selectedPick != null) ...[
+              const SizedBox(height: 10),
+              Text(
+                'Salvo: ${_pickLabel(widget.selectedPick!)}',
+                style: theme.textTheme.bodyMedium,
+              ),
+            ],
+            if (widget.isSaving) ...[
               const SizedBox(height: 12),
               const LinearProgressIndicator(),
             ],
@@ -207,5 +262,13 @@ class _PredictionCard extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  String _pickLabel(MatchPick pick) {
+    return switch (pick) {
+      MatchPick.home => widget.match.homeTeam,
+      MatchPick.draw => 'Empate',
+      MatchPick.away => widget.match.awayTeam,
+    };
   }
 }
