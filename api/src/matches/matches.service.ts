@@ -7,23 +7,25 @@ export class MatchesService {
   constructor(private readonly configService: ConfigService) {}
 
   async getWorldCup2026Matches(): Promise<WorldCupMatch[]> {
-    // Prefer WC2026 API key; fall back to legacy API_FOOTBALL key for compatibility
     const wcKey = this.configService.get<string>('WC2026_API_KEY');
     const fallbackKey = this.configService.get<string>('API_FOOTBALL_KEY');
+    const hasWcKey = this.hasConfiguredKey(wcKey);
+    const hasApiFootballKey = this.hasConfiguredKey(fallbackKey);
 
-    // If neither key is configured, return mock data
-    if ((!wcKey || wcKey === 'coloque_sua_chave_aqui') && (!fallbackKey || fallbackKey === 'coloque_sua_chave_aqui')) {
+    if (!hasWcKey && !hasApiFootballKey) {
       return this.getMockWorldCup2026Matches();
     }
 
-    if (wcKey) {
-      const baseUrl = this.configService.get<string>('WC2026_BASE_URL') ?? 'https://api.wc2026api.com';
+    if (hasWcKey) {
+      const configuredWcKey = this.normalizeKey(wcKey);
+      const baseUrl =
+        this.configService.get<string>('WC2026_BASE_URL') ??
+        'https://api.wc2026api.com';
       const url = new URL('/matches', baseUrl);
 
-      // Optionally filter season/round via query params in the future
       const response = await fetch(url, {
         headers: {
-          Authorization: `Bearer ${wcKey}`,
+          Authorization: `Bearer ${configuredWcKey}`,
         },
       });
 
@@ -33,27 +35,26 @@ export class MatchesService {
 
       const payload = (await response.json()) as Wc2026MatchesResponse;
       if (!Array.isArray(payload)) {
-        // If API returns an object with `data` or similar, try to adapt
-        // but fall back to mock data if format is unexpected
         return this.getMockWorldCup2026Matches();
       }
 
-      return payload.map((m) => {
-        const kickoff = m.kickoff_utc ?? m.kickoff ?? new Date().toISOString();
-        return {
-          fixtureId: m.id ?? m.match_number ?? 0,
-          round: (m.round ?? '') + (m.group_name ? ` - ${m.group_name}` : ''),
-          kickoffLabel: this.formatKickoffLabel(kickoff),
-          kickoffAt: kickoff,
-          homeTeam: m.home_team ?? '',
-          awayTeam: m.away_team ?? '',
-          status: m.phase ?? m.status ?? '',
-        } as WorldCupMatch;
-      });
+      return this.sortByKickoff(
+        payload.map((m) => {
+          const kickoff =
+            m.kickoff_utc ?? m.kickoff ?? new Date().toISOString();
+          return {
+            fixtureId: m.id ?? m.match_number ?? 0,
+            round: (m.round ?? '') + (m.group_name ? ` - ${m.group_name}` : ''),
+            kickoffLabel: this.formatKickoffLabel(kickoff),
+            kickoffAt: kickoff,
+            homeTeam: m.home_team ?? '',
+            awayTeam: m.away_team ?? '',
+            status: m.phase ?? m.status ?? '',
+          } as WorldCupMatch;
+        }),
+      );
     }
 
-    // Legacy API-Football fallback (unchanged behavior)
-    const apiKey = fallbackKey as string;
     const baseUrl =
       this.configService.get<string>('API_FOOTBALL_BASE_URL') ??
       'https://v3.football.api-sports.io';
@@ -63,7 +64,7 @@ export class MatchesService {
 
     const response = await fetch(url, {
       headers: {
-        'x-apisports-key': apiKey,
+        'x-apisports-key': this.normalizeKey(fallbackKey),
       },
     });
 
@@ -72,23 +73,25 @@ export class MatchesService {
     }
 
     const payload = (await response.json()) as ApiFootballFixturesResponse;
-    if (payload.errors && Object.keys(payload.errors).length > 0) {
-      return this.getMockWorldCup2026Matches();
+    if (this.hasApiFootballErrors(payload.errors)) {
+      throw new Error('API-Football retornou erros na consulta de jogos.');
     }
 
     if (payload.response.length === 0) {
       return this.getMockWorldCup2026Matches();
     }
 
-    return payload.response.map((fixture) => ({
-      fixtureId: fixture.fixture.id,
-      round: fixture.league.round,
-      kickoffLabel: this.formatKickoffLabel(fixture.fixture.date),
-      kickoffAt: fixture.fixture.date,
-      homeTeam: fixture.teams.home.name,
-      awayTeam: fixture.teams.away.name,
-      status: fixture.fixture.status.short,
-    }));
+    return this.sortByKickoff(
+      payload.response.map((fixture) => ({
+        fixtureId: fixture.fixture.id,
+        round: fixture.league.round,
+        kickoffLabel: this.formatKickoffLabel(fixture.fixture.date),
+        kickoffAt: fixture.fixture.date,
+        homeTeam: fixture.teams.home.name,
+        awayTeam: fixture.teams.away.name,
+        status: fixture.fixture.status.short,
+      })),
+    );
   }
 
   private getMockWorldCup2026Matches(): WorldCupMatch[] {
@@ -143,10 +146,34 @@ export class MatchesService {
       .format(new Date(dateValue))
       .replace('.', '');
   }
+
+  private hasConfiguredKey(value?: string): boolean {
+    if (!value) return false;
+
+    const trimmed = this.normalizeKey(value);
+    return trimmed.length > 0 && trimmed !== 'coloque_sua_chave_aqui';
+  }
+
+  private normalizeKey(value?: string): string {
+    return (value ?? '').trim().replace(/^['"]|['"]$/g, '');
+  }
+
+  private hasApiFootballErrors(errors?: Record<string, unknown> | unknown[]): boolean {
+    if (!errors) return false;
+    if (Array.isArray(errors)) return errors.length > 0;
+    return Object.keys(errors).length > 0;
+  }
+
+  private sortByKickoff(matches: WorldCupMatch[]): WorldCupMatch[] {
+    return [...matches].sort(
+      (a, b) =>
+        new Date(a.kickoffAt).getTime() - new Date(b.kickoffAt).getTime(),
+    );
+  }
 }
 
 interface ApiFootballFixturesResponse {
-  errors?: Record<string, unknown>;
+  errors?: Record<string, unknown> | unknown[];
   response: ApiFootballFixture[];
 }
 

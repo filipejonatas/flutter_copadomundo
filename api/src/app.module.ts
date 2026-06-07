@@ -6,6 +6,7 @@ import { MatchesModule } from './matches/matches.module';
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
+      envFilePath: ['api/.env', '.env'],
     }),
     MatchesModule,
   ],

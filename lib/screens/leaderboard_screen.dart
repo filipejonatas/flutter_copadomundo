@@ -1,21 +1,44 @@
 import 'package:flutter/material.dart';
 
-import '../main.dart';
+import '../models/app_user.dart';
 import '../models/leaderboard_entry.dart';
+import '../services/leaderboard_service.dart';
 import '../services/session_controller.dart';
 import '../widgets/avatar_badge.dart';
 
-class LeaderboardScreen extends StatelessWidget {
-  const LeaderboardScreen({super.key, required this.sessionController});
+class LeaderboardScreen extends StatefulWidget {
+  const LeaderboardScreen({
+    super.key,
+    required this.sessionController,
+    this.leaderboardService,
+  });
 
   final SessionController sessionController;
+  final LeaderboardService? leaderboardService;
+
+  @override
+  State<LeaderboardScreen> createState() => _LeaderboardScreenState();
+}
+
+class _LeaderboardScreenState extends State<LeaderboardScreen> {
+  late final LeaderboardService _leaderboardService =
+      widget.leaderboardService ?? LeaderboardService();
+  List<LeaderboardEntry> _entries = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadLeaderboard();
+  }
 
   @override
   Widget build(BuildContext context) {
-    final user = sessionController.currentUser!;
-    final userEntry = userToEntry(user);
-    final entries = [...mockLeaderboard, userEntry];
     final theme = Theme.of(context);
+    final userEntry = _currentUserEntry;
+    final topEntries = userEntry == null
+        ? _entries
+        : _entries.where((entry) => entry.userId != userEntry.userId).toList();
 
     return Scaffold(
       appBar: AppBar(title: const Text('Ranking')),
@@ -26,23 +49,97 @@ class LeaderboardScreen extends StatelessWidget {
             Text('Classificacao geral', style: theme.textTheme.headlineMedium),
             const SizedBox(height: 8),
             Text(
-              'Ranking mockado para validar o fluxo antes de conectar resultados oficiais da API externa.',
+              'Cada palpite registrado soma 3 pontos enquanto os resultados oficiais nao chegam.',
               style: theme.textTheme.bodyMedium,
             ),
             const SizedBox(height: 20),
-            Text('Sua posicao', style: theme.textTheme.titleMedium),
-            const SizedBox(height: 10),
-            _LeaderboardTile(entry: userEntry),
-            const SizedBox(height: 20),
-            Text('Top palpites', style: theme.textTheme.titleMedium),
-            const SizedBox(height: 10),
-            for (final entry in entries) ...[
-              _LeaderboardTile(entry: entry),
+            if (_isLoading)
+              const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(32),
+                  child: CircularProgressIndicator(),
+                ),
+              )
+            else ...[
+              if (userEntry != null) ...[
+                Text('Sua posicao', style: theme.textTheme.titleMedium),
+                const SizedBox(height: 10),
+                _LeaderboardTile(entry: userEntry),
+                const SizedBox(height: 20),
+              ],
+              Text('Top palpites', style: theme.textTheme.titleMedium),
               const SizedBox(height: 10),
+              if (topEntries.isEmpty)
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Text(
+                      'Nenhum palpite registrado ainda.',
+                      style: theme.textTheme.bodyMedium,
+                    ),
+                  ),
+                )
+              else
+                for (final entry in topEntries) ...[
+                  _LeaderboardTile(entry: entry),
+                  const SizedBox(height: 10),
+                ],
             ],
           ],
         ),
       ),
+    );
+  }
+
+  LeaderboardEntry? get _currentUserEntry {
+    final user = widget.sessionController.currentUser;
+    if (user == null) return null;
+
+    for (final entry in _entries) {
+      if (entry.userId == user.id) return entry;
+    }
+
+    return null;
+  }
+
+  Future<void> _loadLeaderboard() async {
+    final user = widget.sessionController.currentUser;
+    if (user == null) return;
+
+    try {
+      final entries = await _leaderboardService.loadLeaderboard(user);
+      if (!mounted) return;
+      setState(() {
+        _entries = entries;
+        _isLoading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _entries = [_fallbackEntry(user)];
+        _isLoading = false;
+      });
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Nao foi possivel carregar o ranking online.'),
+          ),
+        );
+      });
+    }
+  }
+
+  LeaderboardEntry _fallbackEntry(AppUser user) {
+    return LeaderboardEntry(
+      position: 1,
+      userId: user.id,
+      nick: user.nick,
+      avatarId: user.avatarId,
+      points: 0,
+      predictionsCount: 0,
+      exactScores: 0,
+      isCurrentUser: true,
     );
   }
 }
@@ -78,7 +175,7 @@ class _LeaderboardTile extends StatelessWidget {
                 children: [
                   Text(entry.nick, style: theme.textTheme.titleMedium),
                   Text(
-                    '${entry.exactScores} placares exatos',
+                    '${entry.predictionsCount} palpites registrados',
                     style: theme.textTheme.bodyMedium,
                   ),
                 ],

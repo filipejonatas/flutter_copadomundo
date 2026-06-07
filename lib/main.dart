@@ -127,37 +127,47 @@ class AppTheme {
 final mockLeaderboard = <LeaderboardEntry>[
   const LeaderboardEntry(
     position: 1,
+    userId: 'mock-canarinho',
     nick: 'Canarinho',
     avatarId: 'cup',
     points: 128,
+    predictionsCount: 24,
     exactScores: 7,
   ),
   const LeaderboardEntry(
     position: 2,
+    userId: 'mock-hexa-vem',
     nick: 'HexaVem',
     avatarId: 'ball',
     points: 116,
+    predictionsCount: 22,
     exactScores: 5,
   ),
   const LeaderboardEntry(
     position: 3,
+    userId: 'mock-mestre',
     nick: 'Mestre dos Palpites',
     avatarId: 'goal',
     points: 104,
+    predictionsCount: 20,
     exactScores: 4,
   ),
   const LeaderboardEntry(
     position: 4,
+    userId: 'mock-zebra',
     nick: 'Zebra Hunter',
     avatarId: 'target',
     points: 91,
+    predictionsCount: 18,
     exactScores: 3,
   ),
   const LeaderboardEntry(
     position: 5,
+    userId: 'mock-var',
     nick: 'VAR Amigo',
     avatarId: 'voice',
     points: 84,
+    predictionsCount: 16,
     exactScores: 2,
   ),
 ];
@@ -165,9 +175,11 @@ final mockLeaderboard = <LeaderboardEntry>[
 LeaderboardEntry userToEntry(AppUser user) {
   return LeaderboardEntry(
     position: 6,
+    userId: user.id,
     nick: user.nick,
     avatarId: user.avatarId,
     points: 72,
+    predictionsCount: 14,
     exactScores: 2,
     isCurrentUser: true,
   );

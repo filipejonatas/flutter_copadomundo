@@ -20,12 +20,15 @@ class PredictionsScreen extends StatefulWidget {
 }
 
 class _PredictionsScreenState extends State<PredictionsScreen> {
+  static const int _matchesPerPage = 4;
+
   final Map<int, MatchPick> _picks = {};
   List<MatchPrediction> _matches = [];
   late final PredictionService _predictionService =
       widget.predictionService ?? PredictionService();
   bool _isLoading = true;
   int? _savingFixtureId;
+  int _pageIndex = 0;
 
   @override
   void initState() {
@@ -36,6 +39,8 @@ class _PredictionsScreenState extends State<PredictionsScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final visibleMatches = _visibleMatches;
+    final totalPages = _totalPages;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Palpites')),
@@ -57,21 +62,58 @@ class _PredictionsScreenState extends State<PredictionsScreen> {
                   child: CircularProgressIndicator(),
                 ),
               )
-            else
-              for (final match in _matches) ...[
-                _PredictionCard(
-                  key: ValueKey(match.fixtureId),
-                  match: match,
-                  selectedPick: _picks[match.fixtureId],
-                  isSaving: _savingFixtureId == match.fixtureId,
-                  onSave: (pick) => _savePrediction(match, pick),
-                ),
-                const SizedBox(height: 12),
+            else ...[
+              if (_matches.isEmpty)
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Text(
+                      'Nenhum jogo encontrado.',
+                      style: theme.textTheme.bodyMedium,
+                    ),
+                  ),
+                )
+              else ...[
+                for (final match in visibleMatches) ...[
+                  _PredictionCard(
+                    key: ValueKey(match.fixtureId),
+                    match: match,
+                    selectedPick: _picks[match.fixtureId],
+                    isSaving: _savingFixtureId == match.fixtureId,
+                    onSave: (pick) => _savePrediction(match, pick),
+                  ),
+                  const SizedBox(height: 12),
+                ],
+                if (totalPages > 1)
+                  _MatchesPager(
+                    currentPage: _pageIndex + 1,
+                    totalPages: totalPages,
+                    onPrevious: _pageIndex == 0
+                        ? null
+                        : () => setState(() => _pageIndex--),
+                    onNext: _pageIndex >= totalPages - 1
+                        ? null
+                        : () => setState(() => _pageIndex++),
+                  ),
               ],
+            ],
           ],
         ),
       ),
     );
+  }
+
+  int get _totalPages {
+    if (_matches.isEmpty) return 0;
+    return ((_matches.length - 1) ~/ _matchesPerPage) + 1;
+  }
+
+  List<MatchPrediction> get _visibleMatches {
+    final start = _pageIndex * _matchesPerPage;
+    if (start >= _matches.length) return const [];
+
+    final end = (start + _matchesPerPage).clamp(0, _matches.length);
+    return _matches.sublist(start, end);
   }
 
   Future<void> _loadPredictions() async {
@@ -84,6 +126,7 @@ class _PredictionsScreenState extends State<PredictionsScreen> {
       if (!mounted) return;
       setState(() {
         _matches = matches;
+        _pageIndex = 0;
         _picks
           ..clear()
           ..addAll(predictions);
@@ -93,6 +136,7 @@ class _PredictionsScreenState extends State<PredictionsScreen> {
       if (!mounted) return;
       setState(() {
         _matches = mockMatches;
+        _pageIndex = 0;
         _isLoading = false;
       });
       _showMessage(
@@ -134,6 +178,52 @@ class _PredictionsScreenState extends State<PredictionsScreen> {
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(SnackBar(content: Text(message)));
+  }
+}
+
+class _MatchesPager extends StatelessWidget {
+  const _MatchesPager({
+    required this.currentPage,
+    required this.totalPages,
+    required this.onPrevious,
+    required this.onNext,
+  });
+
+  final int currentPage;
+  final int totalPages;
+  final VoidCallback? onPrevious;
+  final VoidCallback? onNext;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        child: Row(
+          children: [
+            IconButton(
+              tooltip: 'Pagina anterior',
+              onPressed: onPrevious,
+              icon: const Icon(Icons.chevron_left),
+            ),
+            Expanded(
+              child: Text(
+                'Pagina $currentPage de $totalPages',
+                textAlign: TextAlign.center,
+                style: theme.textTheme.titleMedium,
+              ),
+            ),
+            IconButton(
+              tooltip: 'Proxima pagina',
+              onPressed: onNext,
+              icon: const Icon(Icons.chevron_right),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 
