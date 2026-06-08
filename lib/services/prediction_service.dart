@@ -32,20 +32,27 @@ class PredictionService {
         .toList();
   }
 
-  Future<Map<int, MatchPick>> loadUserPredictions(AppUser user) async {
+  Future<Map<int, UserMatchPrediction>> loadUserPredictions(
+    AppUser user,
+  ) async {
     final snapshot = await _userPredictionsReference(user.id).get();
-    final rawData = snapshot.value;
-    if (rawData is! Map) return <int, MatchPick>{};
+    return parseUserPredictions(snapshot.value);
+  }
 
-    final predictions = <int, MatchPick>{};
+  Map<int, UserMatchPrediction> parseUserPredictions(Object? rawData) {
+    if (rawData is! Map) return <int, UserMatchPrediction>{};
+
+    final predictions = <int, UserMatchPrediction>{};
     for (final entry in rawData.entries) {
       final fixtureId = int.tryParse(entry.key.toString());
       final value = entry.value;
       if (fixtureId == null || value is! Map) continue;
 
-      final pick = pickFromStorageValue(value['pick']);
-      if (pick != null) {
-        predictions[fixtureId] = pick;
+      final prediction = userMatchPredictionFromMap(
+        value.map((key, value) => MapEntry(key.toString(), value)),
+      );
+      if (prediction != null) {
+        predictions[fixtureId] = prediction;
       }
     }
 
@@ -55,11 +62,13 @@ class PredictionService {
   Future<void> savePrediction({
     required AppUser user,
     required MatchPrediction match,
-    required MatchPick pick,
+    required UserMatchPrediction prediction,
   }) async {
     await _userPredictionsReference(user.id).child('${match.fixtureId}').set({
       'fixtureId': match.fixtureId,
-      'pick': pickToStorageValue(pick),
+      'pick': pickToStorageValue(prediction.pick),
+      'homeScore': prediction.homeScore,
+      'awayScore': prediction.awayScore,
       'round': match.round,
       'homeTeam': match.homeTeam,
       'awayTeam': match.awayTeam,

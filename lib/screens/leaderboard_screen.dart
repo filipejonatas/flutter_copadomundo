@@ -49,7 +49,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
             Text('Classificacao geral', style: theme.textTheme.headlineMedium),
             const SizedBox(height: 8),
             Text(
-              'Cada palpite registrado soma 3 pontos enquanto os resultados oficiais nao chegam.',
+              'Pontuacao consolidada apos resultado: 5 pts por placar exato e 3 pts por vencedor ou empate.',
               style: theme.textTheme.bodyMedium,
             ),
             const SizedBox(height: 20),
@@ -175,7 +175,7 @@ class _LeaderboardTile extends StatelessWidget {
                 children: [
                   Text(entry.nick, style: theme.textTheme.titleMedium),
                   Text(
-                    '${entry.predictionsCount} palpites registrados',
+                    '${entry.predictionsCount} palpites consolidados - ${entry.exactScores} placares exatos',
                     style: theme.textTheme.bodyMedium,
                   ),
                 ],

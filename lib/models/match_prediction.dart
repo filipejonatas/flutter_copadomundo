@@ -1,5 +1,19 @@
 enum MatchPick { home, draw, away }
 
+class UserMatchPrediction {
+  const UserMatchPrediction({
+    required this.pick,
+    this.homeScore,
+    this.awayScore,
+  });
+
+  final MatchPick pick;
+  final int? homeScore;
+  final int? awayScore;
+
+  bool get hasExactScore => homeScore != null && awayScore != null;
+}
+
 class MatchPrediction {
   const MatchPrediction({
     required this.fixtureId,
@@ -34,8 +48,8 @@ class MatchPrediction {
       homeTeam: json['homeTeam'] as String,
       awayTeam: json['awayTeam'] as String,
       status: json['status'] as String,
-      homeScore: json['homeScore'] as int?,
-      awayScore: json['awayScore'] as int?,
+      homeScore: intFromStorageValue(json['homeScore']),
+      awayScore: intFromStorageValue(json['awayScore']),
     );
   }
 }
@@ -55,6 +69,29 @@ MatchPick? pickFromStorageValue(Object? value) {
     'away' => MatchPick.away,
     _ => null,
   };
+}
+
+UserMatchPrediction? userMatchPredictionFromMap(Map<String, dynamic> value) {
+  final pick = pickFromStorageValue(value['pick']);
+  if (pick == null) return null;
+
+  return UserMatchPrediction(
+    pick: pick,
+    homeScore: intFromStorageValue(value['homeScore']),
+    awayScore: intFromStorageValue(value['awayScore']),
+  );
+}
+
+int? intFromStorageValue(Object? value) {
+  if (value is int) return value;
+  if (value is num) return value.toInt();
+  if (value is String) return int.tryParse(value);
+  return null;
+}
+
+MatchPick pickFromScore(int homeScore, int awayScore) {
+  if (homeScore == awayScore) return MatchPick.draw;
+  return homeScore > awayScore ? MatchPick.home : MatchPick.away;
 }
 
 final mockMatches = <MatchPrediction>[

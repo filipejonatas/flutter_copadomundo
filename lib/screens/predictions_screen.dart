@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../models/app_user.dart';
 import '../models/match_prediction.dart';
@@ -20,7 +21,7 @@ class PredictionsScreen extends StatefulWidget {
 }
 
 class _PredictionsScreenState extends State<PredictionsScreen> {
-  final Map<int, MatchPick> _picks = {};
+  final Map<int, UserMatchPrediction> _picks = {};
   List<MatchPrediction> _matches = [];
   late final PredictionService _predictionService =
       widget.predictionService ?? PredictionService();
@@ -78,9 +79,9 @@ class _PredictionsScreenState extends State<PredictionsScreen> {
                   _PredictionCard(
                     key: ValueKey(match.fixtureId),
                     match: match,
-                    selectedPick: _picks[match.fixtureId],
+                    selectedPrediction: _picks[match.fixtureId],
                     isSaving: _savingFixtureId == match.fixtureId,
-                    onSave: (pick) => _savePrediction(match, pick),
+                    onSave: (prediction) => _savePrediction(match, prediction),
                   ),
                   const SizedBox(height: 12),
                 ],
@@ -143,7 +144,10 @@ class _PredictionsScreenState extends State<PredictionsScreen> {
     }
   }
 
-  Future<void> _savePrediction(MatchPrediction match, MatchPick pick) async {
+  Future<void> _savePrediction(
+    MatchPrediction match,
+    UserMatchPrediction prediction,
+  ) async {
     final AppUser? user = widget.sessionController.currentUser;
     if (user == null) return;
 
@@ -155,11 +159,11 @@ class _PredictionsScreenState extends State<PredictionsScreen> {
       await _predictionService.savePrediction(
         user: user,
         match: match,
-        pick: pick,
+        prediction: prediction,
       );
       if (!mounted) return;
       setState(() {
-        _picks[match.fixtureId] = pick;
+        _picks[match.fixtureId] = prediction;
       });
       _showMessage('Palpite salvo.');
     } catch (_) {
@@ -242,15 +246,15 @@ class _PredictionCard extends StatefulWidget {
   const _PredictionCard({
     super.key,
     required this.match,
-    required this.selectedPick,
+    required this.selectedPrediction,
     required this.isSaving,
     required this.onSave,
   });
 
   final MatchPrediction match;
-  final MatchPick? selectedPick;
+  final UserMatchPrediction? selectedPrediction;
   final bool isSaving;
-  final ValueChanged<MatchPick> onSave;
+  final ValueChanged<UserMatchPrediction> onSave;
 
   @override
   State<_PredictionCard> createState() => _PredictionCardState();
@@ -258,25 +262,47 @@ class _PredictionCard extends StatefulWidget {
 
 class _PredictionCardState extends State<_PredictionCard> {
   MatchPick? _draftPick;
+  late final TextEditingController _homeScoreController;
+  late final TextEditingController _awayScoreController;
 
   @override
   void initState() {
     super.initState();
-    _draftPick = widget.selectedPick;
+    _draftPick = widget.selectedPrediction?.pick;
+    _homeScoreController = TextEditingController(
+      text: _scoreText(widget.selectedPrediction?.homeScore),
+    );
+    _awayScoreController = TextEditingController(
+      text: _scoreText(widget.selectedPrediction?.awayScore),
+    );
   }
 
   @override
   void didUpdateWidget(covariant _PredictionCard oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.match.fixtureId != widget.match.fixtureId ||
-        oldWidget.selectedPick != widget.selectedPick) {
-      _draftPick = widget.selectedPick;
+        oldWidget.selectedPrediction != widget.selectedPrediction) {
+      _draftPick = widget.selectedPrediction?.pick;
+      _homeScoreController.text = _scoreText(
+        widget.selectedPrediction?.homeScore,
+      );
+      _awayScoreController.text = _scoreText(
+        widget.selectedPrediction?.awayScore,
+      );
     }
+  }
+
+  @override
+  void dispose() {
+    _homeScoreController.dispose();
+    _awayScoreController.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final draftPrediction = _draftPrediction;
 
     return Card(
       child: Padding(
@@ -307,6 +333,30 @@ class _PredictionCardState extends State<_PredictionCard> {
             Text(
               'Status: ${widget.match.status}',
               style: theme.textTheme.bodyMedium,
+            ),
+            const SizedBox(height: 14),
+            Text('Placar do palpite', style: theme.textTheme.titleMedium),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: _ScoreField(
+                    controller: _homeScoreController,
+                    label: widget.match.homeTeam,
+                    enabled: !widget.isSaving,
+                    onChanged: _syncPickFromScore,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: _ScoreField(
+                    controller: _awayScoreController,
+                    label: widget.match.awayTeam,
+                    enabled: !widget.isSaving,
+                    onChanged: _syncPickFromScore,
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 14),
             SegmentedButton<MatchPick>(
@@ -341,17 +391,17 @@ class _PredictionCardState extends State<_PredictionCard> {
             Align(
               alignment: Alignment.centerRight,
               child: FilledButton.icon(
-                onPressed: widget.isSaving || _draftPick == null
+                onPressed: widget.isSaving || draftPrediction == null
                     ? null
-                    : () => widget.onSave(_draftPick!),
+                    : () => widget.onSave(draftPrediction),
                 icon: const Icon(Icons.save),
                 label: const Text('Salvar'),
               ),
             ),
-            if (widget.selectedPick != null) ...[
+            if (widget.selectedPrediction != null) ...[
               const SizedBox(height: 10),
               Text(
-                'Salvo: ${_pickLabel(widget.selectedPick!)}',
+                'Salvo: ${_predictionLabel(widget.selectedPrediction!)}',
                 style: theme.textTheme.bodyMedium,
               ),
             ],
@@ -365,11 +415,76 @@ class _PredictionCardState extends State<_PredictionCard> {
     );
   }
 
+  UserMatchPrediction? get _draftPrediction {
+    final homeScore = int.tryParse(_homeScoreController.text);
+    final awayScore = int.tryParse(_awayScoreController.text);
+
+    if (homeScore != null && awayScore != null) {
+      return UserMatchPrediction(
+        pick: pickFromScore(homeScore, awayScore),
+        homeScore: homeScore,
+        awayScore: awayScore,
+      );
+    }
+
+    if (_draftPick == null) return null;
+    return UserMatchPrediction(pick: _draftPick!);
+  }
+
+  void _syncPickFromScore(String _) {
+    final homeScore = int.tryParse(_homeScoreController.text);
+    final awayScore = int.tryParse(_awayScoreController.text);
+    if (homeScore == null || awayScore == null) {
+      setState(() {});
+      return;
+    }
+
+    final scorePick = pickFromScore(homeScore, awayScore);
+    setState(() => _draftPick = scorePick);
+  }
+
+  String _predictionLabel(UserMatchPrediction prediction) {
+    final score = prediction.hasExactScore
+        ? ' (${prediction.homeScore} x ${prediction.awayScore})'
+        : '';
+    return '${_pickLabel(prediction.pick)}$score';
+  }
+
+  String _scoreText(int? score) {
+    return score?.toString() ?? '';
+  }
+
   String _pickLabel(MatchPick pick) {
     return switch (pick) {
       MatchPick.home => widget.match.homeTeam,
       MatchPick.draw => 'Empate',
       MatchPick.away => widget.match.awayTeam,
     };
+  }
+}
+
+class _ScoreField extends StatelessWidget {
+  const _ScoreField({
+    required this.controller,
+    required this.label,
+    required this.enabled,
+    required this.onChanged,
+  });
+
+  final TextEditingController controller;
+  final String label;
+  final bool enabled;
+  final ValueChanged<String> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return TextField(
+      controller: controller,
+      enabled: enabled,
+      keyboardType: TextInputType.number,
+      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+      onChanged: onChanged,
+      decoration: InputDecoration(labelText: label, hintText: '0'),
+    );
   }
 }
