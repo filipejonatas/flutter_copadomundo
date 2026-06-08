@@ -8,89 +8,48 @@ export class MatchesService {
 
   async getWorldCup2026Matches(): Promise<WorldCupMatch[]> {
     const wcKey = this.configService.get<string>('WC2026_API_KEY');
-    const fallbackKey = this.configService.get<string>('API_FOOTBALL_KEY');
     const hasWcKey = this.hasConfiguredKey(wcKey);
-    const hasApiFootballKey = this.hasConfiguredKey(fallbackKey);
 
-    if (!hasWcKey && !hasApiFootballKey) {
+    if (!hasWcKey) {
       return this.getMockWorldCup2026Matches();
     }
 
-    if (hasWcKey) {
-      const configuredWcKey = this.normalizeKey(wcKey);
-      const baseUrl =
-        this.configService.get<string>('WC2026_BASE_URL') ??
-        'https://api.wc2026api.com';
-      const url = new URL('/matches', baseUrl);
-
-      const response = await fetch(url, {
-        headers: {
-          Authorization: `Bearer ${configuredWcKey}`,
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error(`WC2026 API respondeu status ${response.status}`);
-      }
-
-      const payload = (await response.json()) as Wc2026MatchesResponse;
-      if (!Array.isArray(payload)) {
-        return this.getMockWorldCup2026Matches();
-      }
-
-      return this.sortByKickoff(
-        payload.map((m) => {
-          const kickoff =
-            m.kickoff_utc ?? m.kickoff ?? new Date().toISOString();
-          return {
-            fixtureId: m.id ?? m.match_number ?? 0,
-            round: (m.round ?? '') + (m.group_name ? ` - ${m.group_name}` : ''),
-            kickoffLabel: this.formatKickoffLabel(kickoff),
-            kickoffAt: kickoff,
-            homeTeam: m.home_team ?? '',
-            awayTeam: m.away_team ?? '',
-            status: m.phase ?? m.status ?? '',
-          } as WorldCupMatch;
-        }),
-      );
-    }
-
+    const configuredWcKey = this.normalizeKey(wcKey);
     const baseUrl =
-      this.configService.get<string>('API_FOOTBALL_BASE_URL') ??
-      'https://v3.football.api-sports.io';
-    const url = new URL('/fixtures', baseUrl);
-    url.searchParams.set('league', '1');
-    url.searchParams.set('season', '2026');
+      this.configService.get<string>('WC2026_BASE_URL') ??
+      'https://api.wc2026api.com';
+    const url = new URL('/matches', baseUrl);
 
     const response = await fetch(url, {
       headers: {
-        'x-apisports-key': this.normalizeKey(fallbackKey),
+        Authorization: `Bearer ${configuredWcKey}`,
       },
     });
 
     if (!response.ok) {
-      throw new Error(`API-Football respondeu status ${response.status}`);
+      throw new Error(`WC2026 API respondeu status ${response.status}`);
     }
 
-    const payload = (await response.json()) as ApiFootballFixturesResponse;
-    if (this.hasApiFootballErrors(payload.errors)) {
-      throw new Error('API-Football retornou erros na consulta de jogos.');
-    }
-
-    if (payload.response.length === 0) {
+    const payload = (await response.json()) as Wc2026MatchesResponse;
+    if (!Array.isArray(payload)) {
       return this.getMockWorldCup2026Matches();
     }
 
     return this.sortByKickoff(
-      payload.response.map((fixture) => ({
-        fixtureId: fixture.fixture.id,
-        round: fixture.league.round,
-        kickoffLabel: this.formatKickoffLabel(fixture.fixture.date),
-        kickoffAt: fixture.fixture.date,
-        homeTeam: fixture.teams.home.name,
-        awayTeam: fixture.teams.away.name,
-        status: fixture.fixture.status.short,
-      })),
+      payload.map((m) => {
+        const kickoff = m.kickoff_utc ?? m.kickoff ?? new Date().toISOString();
+        return {
+          fixtureId: m.id ?? m.match_number ?? 0,
+          round: (m.round ?? '') + (m.group_name ? ` - ${m.group_name}` : ''),
+          kickoffLabel: this.formatKickoffLabel(kickoff),
+          kickoffAt: kickoff,
+          homeTeam: m.home_team ?? '',
+          awayTeam: m.away_team ?? '',
+          status: m.phase ?? m.status ?? '',
+          homeScore: this.resolveScore(m, 'home'),
+          awayScore: this.resolveScore(m, 'away'),
+        } as WorldCupMatch;
+      }),
     );
   }
 
@@ -103,7 +62,9 @@ export class MatchesService {
         kickoffAt: '2026-06-11T19:00:00Z',
         homeTeam: 'Mexico',
         awayTeam: 'South Africa',
-        status: 'NS',
+        status: 'FT',
+        homeScore: 2,
+        awayScore: 1,
       },
       {
         fixtureId: 2026002,
@@ -112,7 +73,9 @@ export class MatchesService {
         kickoffAt: '2026-06-12T22:00:00Z',
         homeTeam: 'Canada',
         awayTeam: 'Japan',
-        status: 'NS',
+        status: 'FT',
+        homeScore: 1,
+        awayScore: 1,
       },
       {
         fixtureId: 2026003,
@@ -158,44 +121,19 @@ export class MatchesService {
     return (value ?? '').trim().replace(/^['"]|['"]$/g, '');
   }
 
-  private hasApiFootballErrors(errors?: Record<string, unknown> | unknown[]): boolean {
-    if (!errors) return false;
-    if (Array.isArray(errors)) return errors.length > 0;
-    return Object.keys(errors).length > 0;
-  }
-
   private sortByKickoff(matches: WorldCupMatch[]): WorldCupMatch[] {
     return [...matches].sort(
       (a, b) =>
         new Date(a.kickoffAt).getTime() - new Date(b.kickoffAt).getTime(),
     );
   }
-}
 
-interface ApiFootballFixturesResponse {
-  errors?: Record<string, unknown> | unknown[];
-  response: ApiFootballFixture[];
-}
-
-interface ApiFootballFixture {
-  fixture: {
-    id: number;
-    date: string;
-    status: {
-      short: string;
-    };
-  };
-  league: {
-    round: string;
-  };
-  teams: {
-    home: {
-      name: string;
-    };
-    away: {
-      name: string;
-    };
-  };
+  private resolveScore(match: Wc2026Match, team: 'home' | 'away'): number | undefined {
+    const directScore = team === 'home' ? match.home_score : match.away_score;
+    const camelScore = team === 'home' ? match.homeScore : match.awayScore;
+    const nestedScore = team === 'home' ? match.score?.home : match.score?.away;
+    return directScore ?? camelScore ?? nestedScore;
+  }
 }
 
 // Types for WC2026 API responses
@@ -211,6 +149,14 @@ interface Wc2026Match {
   kickoff?: string;
   status?: string;
   phase?: string;
+  home_score?: number;
+  away_score?: number;
+  homeScore?: number;
+  awayScore?: number;
+  score?: {
+    home?: number;
+    away?: number;
+  };
 }
 
 type Wc2026MatchesResponse = Wc2026Match[];

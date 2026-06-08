@@ -20,15 +20,13 @@ class PredictionsScreen extends StatefulWidget {
 }
 
 class _PredictionsScreenState extends State<PredictionsScreen> {
-  static const int _matchesPerPage = 4;
-
   final Map<int, MatchPick> _picks = {};
   List<MatchPrediction> _matches = [];
   late final PredictionService _predictionService =
       widget.predictionService ?? PredictionService();
   bool _isLoading = true;
   int? _savingFixtureId;
-  int _pageIndex = 0;
+  int _dayIndex = 0;
 
   @override
   void initState() {
@@ -39,8 +37,8 @@ class _PredictionsScreenState extends State<PredictionsScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final visibleMatches = _visibleMatches;
-    final totalPages = _totalPages;
+    final matchDays = _matchDays;
+    final visibleDay = matchDays.isEmpty ? null : matchDays[_dayIndex];
 
     return Scaffold(
       appBar: AppBar(title: const Text('Palpites')),
@@ -74,7 +72,9 @@ class _PredictionsScreenState extends State<PredictionsScreen> {
                   ),
                 )
               else ...[
-                for (final match in visibleMatches) ...[
+                Text(visibleDay!.label, style: theme.textTheme.titleMedium),
+                const SizedBox(height: 12),
+                for (final match in visibleDay.matches) ...[
                   _PredictionCard(
                     key: ValueKey(match.fixtureId),
                     match: match,
@@ -84,16 +84,16 @@ class _PredictionsScreenState extends State<PredictionsScreen> {
                   ),
                   const SizedBox(height: 12),
                 ],
-                if (totalPages > 1)
-                  _MatchesPager(
-                    currentPage: _pageIndex + 1,
-                    totalPages: totalPages,
-                    onPrevious: _pageIndex == 0
+                if (matchDays.length > 1)
+                  _MatchDaysPager(
+                    currentDay: _dayIndex + 1,
+                    totalDays: matchDays.length,
+                    onPrevious: _dayIndex == 0
                         ? null
-                        : () => setState(() => _pageIndex--),
-                    onNext: _pageIndex >= totalPages - 1
+                        : () => setState(() => _dayIndex--),
+                    onNext: _dayIndex >= matchDays.length - 1
                         ? null
-                        : () => setState(() => _pageIndex++),
+                        : () => setState(() => _dayIndex++),
                   ),
               ],
             ],
@@ -103,17 +103,15 @@ class _PredictionsScreenState extends State<PredictionsScreen> {
     );
   }
 
-  int get _totalPages {
-    if (_matches.isEmpty) return 0;
-    return ((_matches.length - 1) ~/ _matchesPerPage) + 1;
-  }
+  List<_MatchDay> get _matchDays {
+    final days = <String, List<MatchPrediction>>{};
+    for (final match in _matches) {
+      days.putIfAbsent(_dayLabel(match), () => []).add(match);
+    }
 
-  List<MatchPrediction> get _visibleMatches {
-    final start = _pageIndex * _matchesPerPage;
-    if (start >= _matches.length) return const [];
-
-    final end = (start + _matchesPerPage).clamp(0, _matches.length);
-    return _matches.sublist(start, end);
+    return days.entries
+        .map((entry) => _MatchDay(label: entry.key, matches: entry.value))
+        .toList();
   }
 
   Future<void> _loadPredictions() async {
@@ -126,7 +124,7 @@ class _PredictionsScreenState extends State<PredictionsScreen> {
       if (!mounted) return;
       setState(() {
         _matches = matches;
-        _pageIndex = 0;
+        _dayIndex = 0;
         _picks
           ..clear()
           ..addAll(predictions);
@@ -136,7 +134,7 @@ class _PredictionsScreenState extends State<PredictionsScreen> {
       if (!mounted) return;
       setState(() {
         _matches = mockMatches;
-        _pageIndex = 0;
+        _dayIndex = 0;
         _isLoading = false;
       });
       _showMessage(
@@ -174,6 +172,12 @@ class _PredictionsScreenState extends State<PredictionsScreen> {
     }
   }
 
+  String _dayLabel(MatchPrediction match) {
+    final labelParts = match.kickoffLabel.split(',');
+    if (labelParts.isEmpty) return 'Dia do jogo';
+    return labelParts.first.trim();
+  }
+
   void _showMessage(String message) {
     ScaffoldMessenger.of(
       context,
@@ -181,16 +185,23 @@ class _PredictionsScreenState extends State<PredictionsScreen> {
   }
 }
 
-class _MatchesPager extends StatelessWidget {
-  const _MatchesPager({
-    required this.currentPage,
-    required this.totalPages,
+class _MatchDay {
+  const _MatchDay({required this.label, required this.matches});
+
+  final String label;
+  final List<MatchPrediction> matches;
+}
+
+class _MatchDaysPager extends StatelessWidget {
+  const _MatchDaysPager({
+    required this.currentDay,
+    required this.totalDays,
     required this.onPrevious,
     required this.onNext,
   });
 
-  final int currentPage;
-  final int totalPages;
+  final int currentDay;
+  final int totalDays;
   final VoidCallback? onPrevious;
   final VoidCallback? onNext;
 
@@ -204,19 +215,19 @@ class _MatchesPager extends StatelessWidget {
         child: Row(
           children: [
             IconButton(
-              tooltip: 'Pagina anterior',
+              tooltip: 'Dia anterior',
               onPressed: onPrevious,
               icon: const Icon(Icons.chevron_left),
             ),
             Expanded(
               child: Text(
-                'Pagina $currentPage de $totalPages',
+                'Dia $currentDay de $totalDays',
                 textAlign: TextAlign.center,
                 style: theme.textTheme.titleMedium,
               ),
             ),
             IconButton(
-              tooltip: 'Proxima pagina',
+              tooltip: 'Proximo dia',
               onPressed: onNext,
               icon: const Icon(Icons.chevron_right),
             ),
