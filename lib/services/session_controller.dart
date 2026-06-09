@@ -13,6 +13,14 @@ abstract class SessionController extends ChangeNotifier {
   String? get errorMessage;
 
   Future<void> signInWithGoogle();
+  Future<void> signInWithEmail({
+    required String email,
+    required String password,
+  });
+  Future<void> createAccountWithEmail({
+    required String email,
+    required String password,
+  });
   Future<void> updateProfile({required String nick, required String avatarId});
   Future<void> signOut();
 }
@@ -75,9 +83,67 @@ class FirebaseSessionController extends SessionController {
         _errorMessage = 'Nao foi possivel entrar com Google.';
       }
     } on FirebaseAuthException catch (error) {
-      _errorMessage = error.message ?? 'Nao foi possivel autenticar.';
+      _errorMessage = _authErrorMessage(
+        error,
+        fallback: 'Nao foi possivel autenticar.',
+      );
     } catch (_) {
       _errorMessage = 'Nao foi possivel entrar. Tente novamente.';
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  @override
+  Future<void> signInWithEmail({
+    required String email,
+    required String password,
+  }) async {
+    _setLoading(true);
+    _errorMessage = null;
+
+    try {
+      await _firebaseAuth.signInWithEmailAndPassword(
+        email: email.trim(),
+        password: password,
+      );
+    } on FirebaseAuthException catch (error) {
+      _errorMessage = _authErrorMessage(
+        error,
+        fallback: 'Nao foi possivel entrar com email.',
+      );
+    } catch (_) {
+      _errorMessage = 'Nao foi possivel entrar com email.';
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  @override
+  Future<void> createAccountWithEmail({
+    required String email,
+    required String password,
+  }) async {
+    _setLoading(true);
+    _errorMessage = null;
+
+    try {
+      final credential = await _firebaseAuth.createUserWithEmailAndPassword(
+        email: email.trim(),
+        password: password,
+      );
+      final user = credential.user;
+      if (user != null &&
+          (user.displayName == null || user.displayName!.isEmpty)) {
+        await user.updateDisplayName(email.trim().split('@').first);
+      }
+    } on FirebaseAuthException catch (error) {
+      _errorMessage = _authErrorMessage(
+        error,
+        fallback: 'Nao foi possivel criar sua conta.',
+      );
+    } catch (_) {
+      _errorMessage = 'Nao foi possivel criar sua conta.';
     } finally {
       _setLoading(false);
     }
@@ -224,6 +290,24 @@ class FirebaseSessionController extends SessionController {
     return _database.ref('users/$uid');
   }
 
+  String _authErrorMessage(
+    FirebaseAuthException error, {
+    required String fallback,
+  }) {
+    return switch (error.code) {
+      'operation-not-allowed' =>
+        'Metodo de login desabilitado no Firebase Console.',
+      'email-already-in-use' => 'Este email ja esta cadastrado.',
+      'invalid-email' => 'Informe um email valido.',
+      'invalid-credential' ||
+      'user-not-found' ||
+      'wrong-password' => 'Email ou senha invalidos.',
+      'weak-password' => 'Use uma senha com pelo menos 6 caracteres.',
+      'network-request-failed' => 'Verifique sua conexao e tente novamente.',
+      _ => error.message ?? fallback,
+    };
+  }
+
   void _setLoading(bool value) {
     _isLoading = value;
     notifyListeners();
@@ -259,6 +343,30 @@ class MockSessionController extends SessionController {
   }
 
   @override
+  Future<void> signInWithEmail({
+    required String email,
+    required String password,
+  }) async {
+    await _mockSignIn(
+      id: 'mock-email-user',
+      email: email.trim(),
+      displayName: email.trim().split('@').first,
+    );
+  }
+
+  @override
+  Future<void> createAccountWithEmail({
+    required String email,
+    required String password,
+  }) async {
+    await _mockSignIn(
+      id: 'mock-email-user',
+      email: email.trim(),
+      displayName: email.trim().split('@').first,
+    );
+  }
+
+  @override
   Future<void> updateProfile({
     required String nick,
     required String avatarId,
@@ -278,6 +386,23 @@ class MockSessionController extends SessionController {
   Future<void> signOut() async {
     _currentUser = null;
     notifyListeners();
+  }
+
+  Future<void> _mockSignIn({
+    required String id,
+    required String email,
+    required String displayName,
+  }) async {
+    _setLoading(true);
+    await Future<void>.delayed(const Duration(milliseconds: 700));
+    _currentUser = AppUser(
+      id: id,
+      email: email,
+      displayName: displayName,
+      nick: 'Novo Palpiteiro',
+      avatarId: 'star',
+    );
+    _setLoading(false);
   }
 
   void _setLoading(bool value) {

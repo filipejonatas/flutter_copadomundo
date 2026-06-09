@@ -12,6 +12,7 @@ import 'screens/home_screen.dart';
 import 'screens/leaderboard_screen.dart';
 import 'screens/predictions_screen.dart';
 import 'screens/profile_screen.dart';
+import 'screens/splash_page.dart';
 import 'theme/app_theme.dart';
 import 'services/session_controller.dart';
 
@@ -35,20 +36,26 @@ class CopaPalpiteApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final router = GoRouter(
-      initialLocation: '/home',
+      initialLocation: '/splash',
       refreshListenable: sessionController,
       redirect: (context, state) {
         final signedIn = sessionController.currentUser != null;
+        final atSplash = state.matchedLocation == '/splash';
         final atLogin = state.matchedLocation == '/login';
+        if (atSplash) return null;
         if (!signedIn) return atLogin ? null : '/login';
         if (atLogin) return '/home';
         return null;
       },
       routes: [
         GoRoute(
+          path: '/splash',
+          builder: (context, state) => const SplashPage(),
+        ),
+        GoRoute(
           path: '/login',
           builder: (context, state) =>
-              LoginScreen(sessionController: sessionController),
+              LoginPage(sessionController: sessionController),
         ),
         StatefulShellRoute.indexedStack(
           builder: (context, state, navigationShell) => MainShell(
