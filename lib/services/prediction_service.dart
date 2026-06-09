@@ -1,6 +1,6 @@
 import 'dart:convert';
 
-import 'package:firebase_database/firebase_database.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
 
 import '../models/app_user.dart';
@@ -8,13 +8,16 @@ import '../models/match_prediction.dart';
 
 class PredictionService {
   PredictionService({
-    FirebaseDatabase? database,
+    FirebaseAuth? firebaseAuth,
     http.Client? httpClient,
-    this.apiBaseUrl = 'http://127.0.0.1:3000',
-  }) : _database = database ?? FirebaseDatabase.instance,
+    this.apiBaseUrl = const String.fromEnvironment(
+      'API_BASE_URL',
+      defaultValue: 'http://127.0.0.1:3000',
+    ),
+  }) : _firebaseAuth = firebaseAuth ?? FirebaseAuth.instance,
        _httpClient = httpClient ?? http.Client();
 
-  final FirebaseDatabase _database;
+  final FirebaseAuth _firebaseAuth;
   final http.Client _httpClient;
   final String apiBaseUrl;
 
@@ -35,8 +38,18 @@ class PredictionService {
   Future<Map<int, UserMatchPrediction>> loadUserPredictions(
     AppUser user,
   ) async {
-    final snapshot = await _userPredictionsReference(user.id).get();
-    return parseUserPredictions(snapshot.value);
+    if (user.id.startsWith('mock-')) return <int, UserMatchPrediction>{};
+
+    final response = await _httpClient.get(
+      Uri.parse('$apiBaseUrl/predictions/me'),
+      headers: await _authHeaders(),
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception('Backend retornou status ${response.statusCode}.');
+    }
+
+    return parseUserPredictions(jsonDecode(response.body));
   }
 
   Map<int, UserMatchPrediction> parseUserPredictions(Object? rawData) {
@@ -64,19 +77,36 @@ class PredictionService {
     required MatchPrediction match,
     required UserMatchPrediction prediction,
   }) async {
-    await _userPredictionsReference(user.id).child('${match.fixtureId}').set({
-      'fixtureId': match.fixtureId,
-      'pick': pickToStorageValue(prediction.pick),
-      'homeScore': prediction.homeScore,
-      'awayScore': prediction.awayScore,
-      'round': match.round,
-      'homeTeam': match.homeTeam,
-      'awayTeam': match.awayTeam,
-      'updatedAt': ServerValue.timestamp,
-    });
+    if (!match.isPredictionOpen()) {
+      throw StateError('Palpites para este jogo ja estao encerrados.');
+    }
+    if (!isValidPredictionScore(prediction.homeScore) ||
+        !isValidPredictionScore(prediction.awayScore)) {
+      throw ArgumentError('Informe placares entre 0 e 9.');
+    }
+
+    final response = await _httpClient.post(
+      Uri.parse('$apiBaseUrl/predictions'),
+      headers: {...await _authHeaders(), 'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'fixtureId': match.fixtureId,
+        'pick': pickToStorageValue(prediction.pick),
+        'homeScore': prediction.homeScore,
+        'awayScore': prediction.awayScore,
+      }),
+    );
+
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw Exception('Backend retornou status ${response.statusCode}.');
+    }
   }
 
-  DatabaseReference _userPredictionsReference(String uid) {
-    return _database.ref('predictions/$uid');
+  Future<Map<String, String>> _authHeaders() async {
+    final token = await _firebaseAuth.currentUser?.getIdToken();
+    if (token == null) {
+      throw StateError('Entre novamente para continuar.');
+    }
+
+    return {'Authorization': 'Bearer $token'};
   }
 }

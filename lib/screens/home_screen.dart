@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
@@ -143,6 +144,14 @@ class _HomeScreenState extends State<HomeScreen> {
       });
     } catch (_) {
       if (!mounted) return;
+      if (kReleaseMode) {
+        setState(() {
+          _matches = [];
+          _dayIndex = 0;
+          _isLoading = false;
+        });
+        return;
+      }
       setState(() {
         _matches = mockMatches;
         _dayIndex = 0;

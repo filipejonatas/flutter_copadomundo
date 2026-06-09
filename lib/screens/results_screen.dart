@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
@@ -110,6 +111,15 @@ class _ResultsScreenState extends State<ResultsScreen> {
       });
     } catch (_) {
       if (!mounted) return;
+      if (kReleaseMode) {
+        setState(() {
+          _matches = [];
+          _dayIndex = 0;
+          _isLoading = false;
+        });
+        _showMessage('Nao foi possivel conectar ao backend.');
+        return;
+      }
       setState(() {
         _matches = mockMatches;
         _dayIndex = 0;

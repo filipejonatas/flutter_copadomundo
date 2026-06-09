@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
@@ -91,6 +92,7 @@ class _PredictionsScreenState extends State<PredictionsScreen> {
                       match: match,
                       selectedPrediction: _picks[match.fixtureId],
                       isSaving: _savingFixtureId == match.fixtureId,
+                      isLocked: !match.isPredictionOpen(),
                       onSave: (prediction) =>
                           _savePrediction(match, prediction),
                     ).animate().fadeIn(duration: 220.ms).slideY(begin: .06),
@@ -143,6 +145,15 @@ class _PredictionsScreenState extends State<PredictionsScreen> {
       });
     } catch (_) {
       if (!mounted) return;
+      if (kReleaseMode) {
+        setState(() {
+          _matches = [];
+          _dayIndex = 0;
+          _isLoading = false;
+        });
+        _showMessage('Nao foi possivel conectar ao backend.');
+        return;
+      }
       setState(() {
         _matches = mockMatches;
         _dayIndex = 0;
@@ -212,12 +223,14 @@ class _PredictionCard extends StatefulWidget {
     required this.match,
     required this.selectedPrediction,
     required this.isSaving,
+    required this.isLocked,
     required this.onSave,
   });
 
   final MatchPrediction match;
   final UserMatchPrediction? selectedPrediction;
   final bool isSaving;
+  final bool isLocked;
   final ValueChanged<UserMatchPrediction> onSave;
 
   @override
@@ -259,7 +272,7 @@ class _PredictionCardState extends State<_PredictionCard> {
                 child: _ScoreStepper(
                   label: widget.match.homeTeam,
                   value: _homeScore,
-                  enabled: !widget.isSaving,
+                  enabled: !widget.isSaving && !widget.isLocked,
                   onChanged: (value) => setState(() => _homeScore = value),
                 ),
               ),
@@ -268,7 +281,7 @@ class _PredictionCardState extends State<_PredictionCard> {
                 child: _ScoreStepper(
                   label: widget.match.awayTeam,
                   value: _awayScore,
-                  enabled: !widget.isSaving,
+                  enabled: !widget.isSaving && !widget.isLocked,
                   onChanged: (value) => setState(() => _awayScore = value),
                 ),
               ),
@@ -276,7 +289,9 @@ class _PredictionCardState extends State<_PredictionCard> {
           ),
           const SizedBox(height: 14),
           FilledButton.icon(
-            onPressed: widget.isSaving ? null : () => widget.onSave(prediction),
+            onPressed: widget.isSaving || widget.isLocked
+                ? null
+                : () => widget.onSave(prediction),
             icon: widget.isSaving
                 ? const SizedBox(
                     width: 18,
@@ -288,6 +303,13 @@ class _PredictionCardState extends State<_PredictionCard> {
               widget.isSaving ? 'Confirmando...' : 'Confirmar palpite',
             ),
           ),
+          if (widget.isLocked) ...[
+            const SizedBox(height: 10),
+            Text(
+              'Palpites encerrados para este jogo.',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+          ],
           if (widget.selectedPrediction != null) ...[
             const SizedBox(height: 10),
             Text(

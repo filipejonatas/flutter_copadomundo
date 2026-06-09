@@ -11,6 +11,9 @@ export class MatchesService {
     const hasWcKey = this.hasConfiguredKey(wcKey);
 
     if (!hasWcKey) {
+      if (this.configService.get<string>('NODE_ENV') === 'production') {
+        throw new Error('WC2026_API_KEY precisa estar configurada em producao.');
+      }
       return this.getMockWorldCup2026Matches();
     }
 

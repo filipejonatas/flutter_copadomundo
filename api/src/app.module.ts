@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { LeaderboardModule } from './leaderboard/leaderboard.module';
 import { MatchesModule } from './matches/matches.module';
+import { PredictionsModule } from './predictions/predictions.module';
 
 @Module({
   imports: [
@@ -9,6 +11,8 @@ import { MatchesModule } from './matches/matches.module';
       envFilePath: ['api/.env', '.env'],
     }),
     MatchesModule,
+    PredictionsModule,
+    LeaderboardModule,
   ],
 })
 export class AppModule {}

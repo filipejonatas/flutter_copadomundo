@@ -1,0 +1,23 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "users": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid",
+        ".validate": "newData.hasChildren(['nick', 'avatarId']) && newData.child('nick').isString() && newData.child('nick').val().length >= 3 && newData.child('nick').val().length <= 24 && newData.child('avatarId').isString()"
+      }
+    },
+    "predictions": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": false
+      }
+    },
+    "scores": {
+      ".read": "auth != null",
+      ".write": false
+    }
+  }
+}

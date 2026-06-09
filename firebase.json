@@ -1,1 +1,26 @@
-{"flutter":{"platforms":{"android":{"default":{"projectId":"copa-palpite","appId":"1:486509842743:android:9a0e1677a1c8367f490ab2","fileOutput":"android/app/google-services.json"}},"dart":{"lib/firebase_options.dart":{"projectId":"copa-palpite","configurations":{"android":"1:486509842743:android:9a0e1677a1c8367f490ab2","ios":"1:486509842743:ios:73d36818527f9ac6490ab2","web":"1:486509842743:web:650a96a42cbf5998490ab2"}}}}}}
+{
+  "database": {
+    "rules": "database.rules.json"
+  },
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "copa-palpite",
+          "appId": "1:486509842743:android:9a0e1677a1c8367f490ab2",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "copa-palpite",
+          "configurations": {
+            "android": "1:486509842743:android:9a0e1677a1c8367f490ab2",
+            "ios": "1:486509842743:ios:73d36818527f9ac6490ab2",
+            "web": "1:486509842743:web:650a96a42cbf5998490ab2"
+          }
+        }
+      }
+    }
+  }
+}

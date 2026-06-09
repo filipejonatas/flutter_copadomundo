@@ -39,6 +39,17 @@ class MatchPrediction {
 
   bool get hasResult => homeScore != null && awayScore != null;
 
+  bool get hasValidKickoff => DateTime.tryParse(kickoffAt) != null;
+
+  bool isPredictionOpen({DateTime? now}) {
+    final kickoff = DateTime.tryParse(kickoffAt);
+    if (kickoff == null) return false;
+    if (!_isPreMatchStatus(status)) return false;
+
+    final referenceTime = now ?? DateTime.now().toUtc();
+    return referenceTime.isBefore(kickoff.toUtc());
+  }
+
   factory MatchPrediction.fromJson(Map<String, dynamic> json) {
     return MatchPrediction(
       fixtureId: json['fixtureId'] as int,
@@ -52,6 +63,17 @@ class MatchPrediction {
       awayScore: intFromStorageValue(json['awayScore']),
     );
   }
+}
+
+bool _isPreMatchStatus(String status) {
+  return switch (status.trim().toUpperCase()) {
+    'NS' || 'TBD' || 'SCHEDULED' || 'NOT_STARTED' || 'PRE_MATCH' => true,
+    _ => false,
+  };
+}
+
+bool isValidPredictionScore(int? score) {
+  return score != null && score >= 0 && score <= 9;
 }
 
 String pickToStorageValue(MatchPick pick) {
