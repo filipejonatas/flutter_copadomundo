@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { cert, getApps, initializeApp, applicationDefault } from 'firebase-admin/app';
+import { getAppCheck } from 'firebase-admin/app-check';
 import { getAuth } from 'firebase-admin/auth';
 import { getDatabase } from 'firebase-admin/database';
 
@@ -8,20 +9,26 @@ import { getDatabase } from 'firebase-admin/database';
 export class FirebaseAdminService {
   constructor(private readonly configService: ConfigService) {
     if (getApps().length === 0) {
+      const databaseURL = this.requiredConfig(
+        'FIREBASE_DATABASE_URL',
+        'https://copa-palpite-default-rtdb.firebaseio.com',
+      );
+      const projectId = this.requiredConfig('FIREBASE_PROJECT_ID', 'copa-palpite');
+
       initializeApp({
         credential: this.resolveCredential(),
-        databaseURL:
-          this.configService.get<string>('FIREBASE_DATABASE_URL') ??
-          'https://copa-palpite-default-rtdb.firebaseio.com',
-        projectId:
-          this.configService.get<string>('FIREBASE_PROJECT_ID') ??
-          'copa-palpite',
+        databaseURL,
+        projectId,
       });
     }
   }
 
   get auth() {
     return getAuth();
+  }
+
+  get appCheck() {
+    return getAppCheck();
   }
 
   get database() {
@@ -46,5 +53,16 @@ export class FirebaseAdminService {
     }
 
     return applicationDefault();
+  }
+
+  private requiredConfig(key: string, developmentFallback: string): string {
+    const value = this.configService.get<string>(key)?.trim();
+    if (value) return value;
+
+    if (this.configService.get<string>('NODE_ENV') === 'production') {
+      throw new Error(`${key} precisa estar configurada em producao.`);
+    }
+
+    return developmentFallback;
   }
 }

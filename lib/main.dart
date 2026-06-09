@@ -14,11 +14,13 @@ import 'screens/predictions_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/splash_page.dart';
 import 'theme/app_theme.dart';
+import 'services/app_check_config.dart';
 import 'services/session_controller.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  await activateAppCheck();
 
   runApp(
     ProviderScope(

@@ -1,28 +1,32 @@
 import 'dart:convert';
 
+import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
 
 import '../models/app_user.dart';
 import '../models/match_prediction.dart';
+import 'api_config.dart';
 
 class PredictionService {
   PredictionService({
     FirebaseAuth? firebaseAuth,
+    FirebaseAppCheck? firebaseAppCheck,
     http.Client? httpClient,
-    this.apiBaseUrl = const String.fromEnvironment(
-      'API_BASE_URL',
-      defaultValue: 'http://127.0.0.1:3000',
-    ),
+    this.apiBaseUrl = const String.fromEnvironment('API_BASE_URL'),
   }) : _firebaseAuth = firebaseAuth ?? FirebaseAuth.instance,
-       _httpClient = httpClient ?? http.Client();
+       _firebaseAppCheck = firebaseAppCheck ?? FirebaseAppCheck.instance,
+       _httpClient = httpClient ?? http.Client(),
+       _apiBaseUri = resolveApiBaseUri(apiBaseUrl);
 
   final FirebaseAuth _firebaseAuth;
+  final FirebaseAppCheck _firebaseAppCheck;
   final http.Client _httpClient;
   final String apiBaseUrl;
+  final Uri _apiBaseUri;
 
   Future<List<MatchPrediction>> loadMatches() async {
-    final uri = Uri.parse('$apiBaseUrl/matches/world-cup-2026');
+    final uri = _apiBaseUri.resolve('/matches/world-cup-2026');
     final response = await _httpClient.get(uri);
 
     if (response.statusCode != 200) {
@@ -41,8 +45,8 @@ class PredictionService {
     if (user.id.startsWith('mock-')) return <int, UserMatchPrediction>{};
 
     final response = await _httpClient.get(
-      Uri.parse('$apiBaseUrl/predictions/me'),
-      headers: await _authHeaders(),
+      _apiBaseUri.resolve('/predictions/me'),
+      headers: await _secureHeaders(),
     );
 
     if (response.statusCode != 200) {
@@ -86,8 +90,11 @@ class PredictionService {
     }
 
     final response = await _httpClient.post(
-      Uri.parse('$apiBaseUrl/predictions'),
-      headers: {...await _authHeaders(), 'Content-Type': 'application/json'},
+      _apiBaseUri.resolve('/predictions'),
+      headers: {
+        ...await _secureHeaders(limitedUseAppCheck: true),
+        'Content-Type': 'application/json',
+      },
       body: jsonEncode({
         'fixtureId': match.fixtureId,
         'pick': pickToStorageValue(prediction.pick),
@@ -108,5 +115,18 @@ class PredictionService {
     }
 
     return {'Authorization': 'Bearer $token'};
+  }
+
+  Future<Map<String, String>> _secureHeaders({
+    bool limitedUseAppCheck = false,
+  }) async {
+    final appCheckToken = limitedUseAppCheck
+        ? await _firebaseAppCheck.getLimitedUseToken()
+        : await _firebaseAppCheck.getToken();
+    if (appCheckToken == null || appCheckToken.isEmpty) {
+      throw StateError('App Check indisponivel. Tente novamente.');
+    }
+
+    return {...await _authHeaders(), 'X-Firebase-AppCheck': appCheckToken};
   }
 }

@@ -1,25 +1,29 @@
 import 'dart:convert';
 
+import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
 
 import '../models/app_user.dart';
 import '../models/leaderboard_entry.dart';
+import 'api_config.dart';
 
 class LeaderboardService {
   LeaderboardService({
     FirebaseAuth? firebaseAuth,
+    FirebaseAppCheck? firebaseAppCheck,
     http.Client? httpClient,
-    this.apiBaseUrl = const String.fromEnvironment(
-      'API_BASE_URL',
-      defaultValue: 'http://127.0.0.1:3000',
-    ),
+    this.apiBaseUrl = const String.fromEnvironment('API_BASE_URL'),
   }) : _firebaseAuth = firebaseAuth ?? FirebaseAuth.instance,
-       _httpClient = httpClient ?? http.Client();
+       _firebaseAppCheck = firebaseAppCheck ?? FirebaseAppCheck.instance,
+       _httpClient = httpClient ?? http.Client(),
+       _apiBaseUri = resolveApiBaseUri(apiBaseUrl);
 
   final FirebaseAuth _firebaseAuth;
+  final FirebaseAppCheck _firebaseAppCheck;
   final http.Client _httpClient;
   final String apiBaseUrl;
+  final Uri _apiBaseUri;
 
   Future<List<LeaderboardEntry>> loadLeaderboard(AppUser currentUser) async {
     if (currentUser.id.startsWith('mock-')) {
@@ -27,8 +31,8 @@ class LeaderboardService {
     }
 
     final response = await _httpClient.get(
-      Uri.parse('$apiBaseUrl/leaderboard'),
-      headers: await _authHeaders(),
+      _apiBaseUri.resolve('/leaderboard'),
+      headers: await _secureHeaders(),
     );
 
     if (response.statusCode != 200) {
@@ -59,6 +63,15 @@ class LeaderboardService {
     }
 
     return {'Authorization': 'Bearer $token'};
+  }
+
+  Future<Map<String, String>> _secureHeaders() async {
+    final appCheckToken = await _firebaseAppCheck.getToken();
+    if (appCheckToken == null || appCheckToken.isEmpty) {
+      throw StateError('App Check indisponivel. Tente novamente.');
+    }
+
+    return {...await _authHeaders(), 'X-Firebase-AppCheck': appCheckToken};
   }
 
   LeaderboardEntry _mockEntry(AppUser user) {

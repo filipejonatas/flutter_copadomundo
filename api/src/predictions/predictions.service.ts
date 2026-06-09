@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { DecodedIdToken } from 'firebase-admin/auth';
 import { ServerValue } from 'firebase-admin/database';
 import { WorldCupMatch } from '../matches/world-cup-match';
@@ -30,7 +31,14 @@ export class PredictionsService {
   constructor(
     private readonly firebaseAdmin: FirebaseAdminService,
     private readonly matchesService: MatchesService,
-  ) {}
+    configService: ConfigService,
+  ) {
+    this.cutoffBufferMs =
+      this.positiveInt(configService.get<string>('PREDICTION_CUTOFF_BUFFER_SECONDS'), 60) *
+      1000;
+  }
+
+  private readonly cutoffBufferMs: number;
 
   async getUserPredictions(uid: string): Promise<Record<string, UserMatchPrediction>> {
     const snapshot = await this.firebaseAdmin.database
@@ -90,7 +98,7 @@ export class PredictionsService {
     const kickoff = new Date(match.kickoffAt);
     if (Number.isNaN(kickoff.getTime())) return false;
     if (!this.isPreMatchStatus(match.status)) return false;
-    return now.getTime() < kickoff.getTime();
+    return now.getTime() < kickoff.getTime() - this.cutoffBufferMs;
   }
 
   pickFromScore(homeScore: number, awayScore: number): MatchPick {
@@ -98,7 +106,7 @@ export class PredictionsService {
     return homeScore > awayScore ? 'home' : 'away';
   }
 
-  private validFixtureId(value: unknown): number {
+  validFixtureId(value: unknown): number {
     if (typeof value !== 'number' || !Number.isInteger(value) || value <= 0) {
       throw new BadRequestException('fixtureId invalido.');
     }
@@ -126,5 +134,10 @@ export class PredictionsService {
   private asRecord(value: unknown): Record<string, UserMatchPrediction> {
     if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
     return value as Record<string, UserMatchPrediction>;
+  }
+
+  private positiveInt(value: string | undefined, fallback: number): number {
+    const parsed = Number(value);
+    return Number.isInteger(parsed) && parsed >= 0 ? parsed : fallback;
   }
 }

@@ -46,6 +46,7 @@ dependencies:
   flutter_animate: ^4.5.2
   riverpod: ^3.2.1
   flutter_svg: ^2.3.0
+  firebase_app_check: ^0.4.4+2
 
 dev_dependencies:
   flutter_test:

@@ -10,7 +10,11 @@ export class LeaderboardController {
   ) {}
 
   @Get()
-  async getLeaderboard(@Headers('authorization') authorization?: string) {
+  async getLeaderboard(
+    @Headers('authorization') authorization?: string,
+    @Headers('x-firebase-appcheck') appCheckToken?: string,
+  ) {
+    await this.authService.verifyAppCheckHeader(appCheckToken);
     await this.authService.verifyAuthorizationHeader(authorization);
     return this.leaderboardService.loadLeaderboard();
   }
