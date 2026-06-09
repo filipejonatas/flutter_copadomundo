@@ -15,19 +15,29 @@ void main() {
     await tester.tap(find.text('Entrar com Google'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Meu perfil'), findsOneWidget);
+    expect(find.text('Fase de grupos'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Profile'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Profile'), findsOneWidget);
     expect(find.text('Novo Palpiteiro'), findsWidgets);
 
     await tester.enterText(find.byType(TextField), 'Craque Teste');
+    await tester.scrollUntilVisible(
+      find.text('Salvar perfil'),
+      220,
+      scrollable: find.byType(Scrollable).first,
+    );
     await tester.tap(find.text('Salvar perfil'));
     await tester.pumpAndSettle();
 
     expect(find.text('Craque Teste'), findsWidgets);
 
-    await tester.tap(find.text('Ranking'));
+    await tester.tap(find.byTooltip('Ranking'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Classificacao geral'), findsOneWidget);
+    expect(find.text('Leaderboard'), findsOneWidget);
     expect(find.text('Craque Teste'), findsOneWidget);
   });
 }

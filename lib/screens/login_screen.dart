@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../services/session_controller.dart';
+import '../theme/app_theme.dart';
 
+/// Login screen for Google authentication before entering the bolao.
 class LoginScreen extends StatelessWidget {
   const LoginScreen({super.key, required this.sessionController});
 
@@ -26,12 +29,12 @@ class LoginScreen extends StatelessWidget {
                     height: 92,
                     alignment: Alignment.center,
                     decoration: BoxDecoration(
-                      color: theme.colorScheme.primary,
+                      color: AppColors.primaryAccent,
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(
-                      Icons.sports_soccer,
-                      color: Colors.white,
+                    child: PhosphorIcon(
+                      PhosphorIcons.soccerBall(PhosphorIconsStyle.fill),
+                      color: Colors.black,
                       size: 42,
                     ),
                   ),
@@ -58,7 +61,7 @@ class LoginScreen extends StatelessWidget {
                             height: 20,
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
-                        : const Icon(Icons.login),
+                        : PhosphorIcon(PhosphorIcons.signIn()),
                     label: Text(
                       sessionController.isLoading
                           ? 'Entrando...'

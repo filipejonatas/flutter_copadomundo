@@ -1,8 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../models/match_prediction.dart';
 import '../services/prediction_service.dart';
+import '../theme/app_theme.dart';
+import '../widgets/match_card.dart';
 
+/// Matches screen showing official scores and status cards by date.
 class ResultsScreen extends StatefulWidget {
   const ResultsScreen({super.key, this.predictionService});
 
@@ -32,15 +37,16 @@ class _ResultsScreenState extends State<ResultsScreen> {
     final visibleDay = matchDays.isEmpty ? null : matchDays[_dayIndex];
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Resultados')),
+      appBar: AppBar(title: const Text('Matches')),
       body: SafeArea(
+        bottom: false,
         child: ListView(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.fromLTRB(20, 10, 20, 120),
           children: [
-            Text('Resultados dos jogos', style: theme.textTheme.headlineMedium),
+            Text('Calendario oficial', style: theme.textTheme.headlineMedium),
             const SizedBox(height: 8),
             Text(
-              'Acompanhe os placares oficiais partida por partida.',
+              'Placares e status da fase de grupos em tempo real.',
               style: theme.textTheme.bodyMedium,
             ),
             const SizedBox(height: 20),
@@ -52,22 +58,18 @@ class _ResultsScreenState extends State<ResultsScreen> {
                 ),
               )
             else if (_matches.isEmpty)
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Text(
-                    'Nenhum resultado encontrado.',
-                    style: theme.textTheme.bodyMedium,
-                  ),
-                ),
-              )
+              const _SurfaceMessage(message: 'Nenhum resultado encontrado.')
             else ...[
               Text(visibleDay!.label, style: theme.textTheme.titleMedium),
               const SizedBox(height: 12),
-              for (final match in visibleDay.matches) ...[
-                _ResultCard(match: match),
-                const SizedBox(height: 12),
-              ],
+              for (final match in visibleDay.matches)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: MatchCard(match: match)
+                      .animate()
+                      .fadeIn(duration: 220.ms)
+                      .slideY(begin: .06, end: 0),
+                ),
               if (matchDays.length > 1)
                 _MatchDaysPager(
                   currentDay: _dayIndex + 1,
@@ -154,119 +156,51 @@ class _MatchDaysPager extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-        child: Row(
-          children: [
-            IconButton(
-              tooltip: 'Dia anterior',
-              onPressed: onPrevious,
-              icon: const Icon(Icons.chevron_left),
-            ),
-            Expanded(
-              child: Text(
-                'Dia $currentDay de $totalDays',
-                textAlign: TextAlign.center,
-                style: theme.textTheme.titleMedium,
-              ),
-            ),
-            IconButton(
-              tooltip: 'Proximo dia',
-              onPressed: onNext,
-              icon: const Icon(Icons.chevron_right),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _ResultCard extends StatelessWidget {
-  const _ResultCard({required this.match});
-
-  final MatchPrediction match;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(match.round, style: theme.textTheme.titleMedium),
-                ),
-                Text(match.kickoffLabel, style: theme.textTheme.bodyMedium),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    match.homeTeam,
-                    style: theme.textTheme.titleMedium,
-                  ),
-                ),
-                _ScoreBox(score: match.homeScore),
-              ],
-            ),
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    match.awayTeam,
-                    style: theme.textTheme.titleMedium,
-                  ),
-                ),
-                _ScoreBox(score: match.awayScore),
-              ],
-            ),
-            const SizedBox(height: 14),
-            Text(
-              match.hasResult
-                  ? 'Resultado final'
-                  : 'Resultado pendente - status: ${match.status}',
-              style: theme.textTheme.bodyMedium,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _ScoreBox extends StatelessWidget {
-  const _ScoreBox({required this.score});
-
-  final int? score;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
     return Container(
-      width: 44,
-      height: 36,
-      alignment: Alignment.center,
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
-        color: theme.colorScheme.primary.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: theme.colorScheme.primary.withValues(alpha: 0.2),
-        ),
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(AppRadii.card),
       ),
-      child: Text(score?.toString() ?? '-', style: theme.textTheme.titleLarge),
+      child: Row(
+        children: [
+          IconButton(
+            tooltip: 'Dia anterior',
+            onPressed: onPrevious,
+            icon: PhosphorIcon(PhosphorIcons.caretLeft()),
+          ),
+          Expanded(
+            child: Text(
+              'Dia $currentDay de $totalDays',
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+          ),
+          IconButton(
+            tooltip: 'Proximo dia',
+            onPressed: onNext,
+            icon: PhosphorIcon(PhosphorIcons.caretRight()),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SurfaceMessage extends StatelessWidget {
+  const _SurfaceMessage({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(AppRadii.card),
+      ),
+      child: Text(message, style: Theme.of(context).textTheme.bodyMedium),
     );
   }
 }

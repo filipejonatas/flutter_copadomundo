@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 class AvatarOption {
   const AvatarOption({
@@ -13,12 +14,36 @@ class AvatarOption {
 }
 
 const avatarOptions = [
-  AvatarOption(id: 'star', icon: Icons.star, color: Color(0xFFF6C44F)),
-  AvatarOption(id: 'ball', icon: Icons.sports_soccer, color: Color(0xFF0E7C4F)),
-  AvatarOption(id: 'cup', icon: Icons.emoji_events, color: Color(0xFFD79222)),
-  AvatarOption(id: 'target', icon: Icons.gps_fixed, color: Color(0xFFC53B3B)),
-  AvatarOption(id: 'goal', icon: Icons.sports, color: Color(0xFF3B66C5)),
-  AvatarOption(id: 'voice', icon: Icons.campaign, color: Color(0xFF6E4CC5)),
+  AvatarOption(
+    id: 'star',
+    icon: PhosphorIconsRegular.star,
+    color: Color(0xFFC6F135),
+  ),
+  AvatarOption(
+    id: 'ball',
+    icon: PhosphorIconsRegular.soccerBall,
+    color: Color(0xFF00C896),
+  ),
+  AvatarOption(
+    id: 'cup',
+    icon: PhosphorIconsRegular.trophy,
+    color: Color(0xFFD79222),
+  ),
+  AvatarOption(
+    id: 'target',
+    icon: PhosphorIconsRegular.crosshair,
+    color: Color(0xFFFF3B30),
+  ),
+  AvatarOption(
+    id: 'goal',
+    icon: PhosphorIconsRegular.flag,
+    color: Color(0xFF49A7FF),
+  ),
+  AvatarOption(
+    id: 'voice',
+    icon: PhosphorIconsRegular.megaphone,
+    color: Color(0xFFB58CFF),
+  ),
 ];
 
 AvatarOption avatarById(String id) {

@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../models/avatar_option.dart';
+import '../theme/app_theme.dart';
 
+/// Circular user avatar badge based on a selected Phosphor icon.
 class AvatarBadge extends StatelessWidget {
   const AvatarBadge({super.key, required this.avatarId, this.radius = 22});
 
@@ -14,8 +17,8 @@ class AvatarBadge extends StatelessWidget {
 
     return CircleAvatar(
       radius: radius,
-      backgroundColor: avatar.color.withValues(alpha: .18),
-      child: Icon(avatar.icon, color: avatar.color, size: radius),
+      backgroundColor: AppColors.surfaceElevated,
+      child: PhosphorIcon(avatar.icon, color: avatar.color, size: radius),
     );
   }
 }

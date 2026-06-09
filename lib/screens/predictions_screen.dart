@@ -1,11 +1,16 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import 'package:flutter_animate/flutter_animate.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../models/app_user.dart';
 import '../models/match_prediction.dart';
 import '../services/prediction_service.dart';
 import '../services/session_controller.dart';
+import '../theme/app_theme.dart';
+import '../widgets/logout_circle_button.dart';
+import '../widgets/match_card.dart';
 
+/// Palpite screen where users predict exact scores for each match.
 class PredictionsScreen extends StatefulWidget {
   const PredictionsScreen({
     super.key,
@@ -42,15 +47,26 @@ class _PredictionsScreenState extends State<PredictionsScreen> {
     final visibleDay = matchDays.isEmpty ? null : matchDays[_dayIndex];
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Palpites')),
+      appBar: AppBar(
+        title: const Text('Matches'),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 12),
+            child: LogoutCircleButton(
+              sessionController: widget.sessionController,
+            ),
+          ),
+        ],
+      ),
       body: SafeArea(
+        bottom: false,
         child: ListView(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.fromLTRB(20, 10, 20, 120),
           children: [
-            Text('Registrar palpites', style: theme.textTheme.headlineMedium),
+            Text('Seus palpites', style: theme.textTheme.headlineMedium),
             const SizedBox(height: 8),
             Text(
-              'Escolha o vencedor ou empate antes da bola rolar.',
+              'Ajuste o placar de 0 a 9 antes da bola rolar.',
               style: theme.textTheme.bodyMedium,
             ),
             const SizedBox(height: 20),
@@ -63,28 +79,22 @@ class _PredictionsScreenState extends State<PredictionsScreen> {
               )
             else ...[
               if (_matches.isEmpty)
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Text(
-                      'Nenhum jogo encontrado.',
-                      style: theme.textTheme.bodyMedium,
-                    ),
-                  ),
-                )
+                const _SurfaceMessage(message: 'Nenhum jogo encontrado.')
               else ...[
                 Text(visibleDay!.label, style: theme.textTheme.titleMedium),
                 const SizedBox(height: 12),
-                for (final match in visibleDay.matches) ...[
-                  _PredictionCard(
-                    key: ValueKey(match.fixtureId),
-                    match: match,
-                    selectedPrediction: _picks[match.fixtureId],
-                    isSaving: _savingFixtureId == match.fixtureId,
-                    onSave: (prediction) => _savePrediction(match, prediction),
+                for (final match in visibleDay.matches)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: _PredictionCard(
+                      key: ValueKey(match.fixtureId),
+                      match: match,
+                      selectedPrediction: _picks[match.fixtureId],
+                      isSaving: _savingFixtureId == match.fixtureId,
+                      onSave: (prediction) =>
+                          _savePrediction(match, prediction),
+                    ).animate().fadeIn(duration: 220.ms).slideY(begin: .06),
                   ),
-                  const SizedBox(height: 12),
-                ],
                 if (matchDays.length > 1)
                   _MatchDaysPager(
                     currentDay: _dayIndex + 1,
@@ -196,52 +206,6 @@ class _MatchDay {
   final List<MatchPrediction> matches;
 }
 
-class _MatchDaysPager extends StatelessWidget {
-  const _MatchDaysPager({
-    required this.currentDay,
-    required this.totalDays,
-    required this.onPrevious,
-    required this.onNext,
-  });
-
-  final int currentDay;
-  final int totalDays;
-  final VoidCallback? onPrevious;
-  final VoidCallback? onNext;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-        child: Row(
-          children: [
-            IconButton(
-              tooltip: 'Dia anterior',
-              onPressed: onPrevious,
-              icon: const Icon(Icons.chevron_left),
-            ),
-            Expanded(
-              child: Text(
-                'Dia $currentDay de $totalDays',
-                textAlign: TextAlign.center,
-                style: theme.textTheme.titleMedium,
-              ),
-            ),
-            IconButton(
-              tooltip: 'Proximo dia',
-              onPressed: onNext,
-              icon: const Icon(Icons.chevron_right),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 class _PredictionCard extends StatefulWidget {
   const _PredictionCard({
     super.key,
@@ -261,20 +225,13 @@ class _PredictionCard extends StatefulWidget {
 }
 
 class _PredictionCardState extends State<_PredictionCard> {
-  MatchPick? _draftPick;
-  late final TextEditingController _homeScoreController;
-  late final TextEditingController _awayScoreController;
+  late int _homeScore;
+  late int _awayScore;
 
   @override
   void initState() {
     super.initState();
-    _draftPick = widget.selectedPrediction?.pick;
-    _homeScoreController = TextEditingController(
-      text: _scoreText(widget.selectedPrediction?.homeScore),
-    );
-    _awayScoreController = TextEditingController(
-      text: _scoreText(widget.selectedPrediction?.awayScore),
-    );
+    _syncFromWidget();
   }
 
   @override
@@ -282,176 +239,82 @@ class _PredictionCardState extends State<_PredictionCard> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.match.fixtureId != widget.match.fixtureId ||
         oldWidget.selectedPrediction != widget.selectedPrediction) {
-      _draftPick = widget.selectedPrediction?.pick;
-      _homeScoreController.text = _scoreText(
-        widget.selectedPrediction?.homeScore,
-      );
-      _awayScoreController.text = _scoreText(
-        widget.selectedPrediction?.awayScore,
-      );
+      _syncFromWidget();
     }
-  }
-
-  @override
-  void dispose() {
-    _homeScoreController.dispose();
-    _awayScoreController.dispose();
-    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final draftPrediction = _draftPrediction;
+    final prediction = _draftPrediction;
 
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    widget.match.round,
-                    style: theme.textTheme.titleMedium,
-                  ),
+    return MatchCard(
+      match: widget.match,
+      homeScoreOverride: _homeScore,
+      awayScoreOverride: _awayScore,
+      footer: Column(
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: _ScoreStepper(
+                  label: widget.match.homeTeam,
+                  value: _homeScore,
+                  enabled: !widget.isSaving,
+                  onChanged: (value) => setState(() => _homeScore = value),
                 ),
-                Text(
-                  widget.match.kickoffLabel,
-                  style: theme.textTheme.bodyMedium,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _ScoreStepper(
+                  label: widget.match.awayTeam,
+                  value: _awayScore,
+                  enabled: !widget.isSaving,
+                  onChanged: (value) => setState(() => _awayScore = value),
                 ),
-              ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          FilledButton.icon(
+            onPressed: widget.isSaving ? null : () => widget.onSave(prediction),
+            icon: widget.isSaving
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : PhosphorIcon(PhosphorIcons.checkCircle()),
+            label: Text(
+              widget.isSaving ? 'Confirmando...' : 'Confirmar palpite',
             ),
-            const SizedBox(height: 12),
-            Text(
-              '${widget.match.homeTeam} x ${widget.match.awayTeam}',
-              style: theme.textTheme.titleLarge,
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'Status: ${widget.match.status}',
-              style: theme.textTheme.bodyMedium,
-            ),
-            const SizedBox(height: 14),
-            Text('Placar do palpite', style: theme.textTheme.titleMedium),
+          ),
+          if (widget.selectedPrediction != null) ...[
             const SizedBox(height: 10),
-            Row(
-              children: [
-                Expanded(
-                  child: _ScoreField(
-                    controller: _homeScoreController,
-                    label: widget.match.homeTeam,
-                    enabled: !widget.isSaving,
-                    onChanged: _syncPickFromScore,
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: _ScoreField(
-                    controller: _awayScoreController,
-                    label: widget.match.awayTeam,
-                    enabled: !widget.isSaving,
-                    onChanged: _syncPickFromScore,
-                  ),
-                ),
-              ],
+            Text(
+              'Salvo: ${_predictionLabel(widget.selectedPrediction!)}',
+              style: Theme.of(context).textTheme.bodyMedium,
             ),
-            const SizedBox(height: 14),
-            SegmentedButton<MatchPick>(
-              emptySelectionAllowed: true,
-              segments: [
-                ButtonSegment(
-                  value: MatchPick.home,
-                  label: Text(widget.match.homeTeam),
-                  icon: const Icon(Icons.home),
-                ),
-                const ButtonSegment(
-                  value: MatchPick.draw,
-                  label: Text('Empate'),
-                  icon: Icon(Icons.balance),
-                ),
-                ButtonSegment(
-                  value: MatchPick.away,
-                  label: Text(widget.match.awayTeam),
-                  icon: const Icon(Icons.flight_takeoff),
-                ),
-              ],
-              selected: _draftPick == null ? {} : {_draftPick!},
-              onSelectionChanged: widget.isSaving
-                  ? null
-                  : (selection) {
-                      setState(() {
-                        _draftPick = selection.isEmpty ? null : selection.first;
-                      });
-                    },
-            ),
-            const SizedBox(height: 12),
-            Align(
-              alignment: Alignment.centerRight,
-              child: FilledButton.icon(
-                onPressed: widget.isSaving || draftPrediction == null
-                    ? null
-                    : () => widget.onSave(draftPrediction),
-                icon: const Icon(Icons.save),
-                label: const Text('Salvar'),
-              ),
-            ),
-            if (widget.selectedPrediction != null) ...[
-              const SizedBox(height: 10),
-              Text(
-                'Salvo: ${_predictionLabel(widget.selectedPrediction!)}',
-                style: theme.textTheme.bodyMedium,
-              ),
-            ],
-            if (widget.isSaving) ...[
-              const SizedBox(height: 12),
-              const LinearProgressIndicator(),
-            ],
           ],
-        ),
+        ],
       ),
     );
   }
 
-  UserMatchPrediction? get _draftPrediction {
-    final homeScore = int.tryParse(_homeScoreController.text);
-    final awayScore = int.tryParse(_awayScoreController.text);
-
-    if (homeScore != null && awayScore != null) {
-      return UserMatchPrediction(
-        pick: pickFromScore(homeScore, awayScore),
-        homeScore: homeScore,
-        awayScore: awayScore,
-      );
-    }
-
-    if (_draftPick == null) return null;
-    return UserMatchPrediction(pick: _draftPick!);
+  UserMatchPrediction get _draftPrediction {
+    return UserMatchPrediction(
+      pick: pickFromScore(_homeScore, _awayScore),
+      homeScore: _homeScore,
+      awayScore: _awayScore,
+    );
   }
 
-  void _syncPickFromScore(String _) {
-    final homeScore = int.tryParse(_homeScoreController.text);
-    final awayScore = int.tryParse(_awayScoreController.text);
-    if (homeScore == null || awayScore == null) {
-      setState(() {});
-      return;
-    }
-
-    final scorePick = pickFromScore(homeScore, awayScore);
-    setState(() => _draftPick = scorePick);
+  void _syncFromWidget() {
+    _homeScore = widget.selectedPrediction?.homeScore ?? 0;
+    _awayScore = widget.selectedPrediction?.awayScore ?? 0;
   }
 
   String _predictionLabel(UserMatchPrediction prediction) {
-    final score = prediction.hasExactScore
-        ? ' (${prediction.homeScore} x ${prediction.awayScore})'
-        : '';
-    return '${_pickLabel(prediction.pick)}$score';
-  }
-
-  String _scoreText(int? score) {
-    return score?.toString() ?? '';
+    return '${_pickLabel(prediction.pick)} (${prediction.homeScore} x ${prediction.awayScore})';
   }
 
   String _pickLabel(MatchPick pick) {
@@ -463,28 +326,157 @@ class _PredictionCardState extends State<_PredictionCard> {
   }
 }
 
-class _ScoreField extends StatelessWidget {
-  const _ScoreField({
-    required this.controller,
+class _ScoreStepper extends StatelessWidget {
+  const _ScoreStepper({
     required this.label,
+    required this.value,
     required this.enabled,
     required this.onChanged,
   });
 
-  final TextEditingController controller;
   final String label;
+  final int value;
   final bool enabled;
-  final ValueChanged<String> onChanged;
+  final ValueChanged<int> onChanged;
 
   @override
   Widget build(BuildContext context) {
-    return TextField(
-      controller: controller,
-      enabled: enabled,
-      keyboardType: TextInputType.number,
-      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-      onChanged: onChanged,
-      decoration: InputDecoration(labelText: label, hintText: '0'),
+    final theme = Theme.of(context);
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceElevated,
+        borderRadius: BorderRadius.circular(AppRadii.card),
+      ),
+      child: Column(
+        children: [
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.bodyMedium,
+          ),
+          const SizedBox(height: 10),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              _StepButton(
+                tooltip: 'Diminuir',
+                icon: PhosphorIcons.minus(),
+                enabled: enabled && value > 0,
+                onTap: () => onChanged(value - 1),
+              ),
+              SizedBox(
+                width: 44,
+                child: Text(
+                  '$value',
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.titleLarge?.copyWith(fontSize: 28),
+                ),
+              ),
+              _StepButton(
+                tooltip: 'Aumentar',
+                icon: PhosphorIcons.plus(),
+                enabled: enabled && value < 9,
+                onTap: () => onChanged(value + 1),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StepButton extends StatelessWidget {
+  const _StepButton({
+    required this.tooltip,
+    required this.icon,
+    required this.enabled,
+    required this.onTap,
+  });
+
+  final String tooltip;
+  final PhosphorIconData icon;
+  final bool enabled;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      tooltip: tooltip,
+      onPressed: enabled ? onTap : null,
+      style: IconButton.styleFrom(
+        backgroundColor: AppColors.background,
+        foregroundColor: AppColors.primaryAccent,
+        disabledForegroundColor: AppColors.textSecondary,
+      ),
+      icon: PhosphorIcon(icon, size: 18),
+    );
+  }
+}
+
+class _MatchDaysPager extends StatelessWidget {
+  const _MatchDaysPager({
+    required this.currentDay,
+    required this.totalDays,
+    required this.onPrevious,
+    required this.onNext,
+  });
+
+  final int currentDay;
+  final int totalDays;
+  final VoidCallback? onPrevious;
+  final VoidCallback? onNext;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(AppRadii.card),
+      ),
+      child: Row(
+        children: [
+          IconButton(
+            tooltip: 'Dia anterior',
+            onPressed: onPrevious,
+            icon: PhosphorIcon(PhosphorIcons.caretLeft()),
+          ),
+          Expanded(
+            child: Text(
+              'Dia $currentDay de $totalDays',
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+          ),
+          IconButton(
+            tooltip: 'Proximo dia',
+            onPressed: onNext,
+            icon: PhosphorIcon(PhosphorIcons.caretRight()),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SurfaceMessage extends StatelessWidget {
+  const _SurfaceMessage({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(AppRadii.card),
+      ),
+      child: Text(message, style: Theme.of(context).textTheme.bodyMedium),
     );
   }
 }
