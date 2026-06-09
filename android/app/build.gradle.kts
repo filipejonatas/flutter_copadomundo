@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     // START: FlutterFire Configuration
@@ -6,6 +8,15 @@ plugins {
     id("kotlin-android")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
+}
+
+val keystoreProperties = Properties()
+val keystorePropertiesFile = rootProject.file("key.properties")
+if (keystorePropertiesFile.exists()) {
+    keystorePropertiesFile.inputStream().use { keystoreProperties.load(it) }
+}
+val isReleaseBuild = gradle.startParameter.taskNames.any {
+    it.lowercase().contains("release")
 }
 
 android {
@@ -33,11 +44,42 @@ android {
         versionName = flutter.versionName
     }
 
+    signingConfigs {
+        create("release") {
+            val storeFilePath = keystoreProperties["storeFile"] as String?
+            val storePasswordValue = keystoreProperties["storePassword"] as String?
+            val keyAliasValue = keystoreProperties["keyAlias"] as String?
+            val keyPasswordValue = keystoreProperties["keyPassword"] as String?
+            val hasReleaseSigning =
+                !storeFilePath.isNullOrBlank() &&
+                    !storePasswordValue.isNullOrBlank() &&
+                    !keyAliasValue.isNullOrBlank() &&
+                    !keyPasswordValue.isNullOrBlank()
+
+            if (!hasReleaseSigning && isReleaseBuild) {
+                throw GradleException(
+                    "Release signing requires android/key.properties with storeFile, storePassword, keyAlias and keyPassword.",
+                )
+            }
+
+            if (hasReleaseSigning) {
+                storeFile = rootProject.file(storeFilePath)
+                storePassword = storePasswordValue
+                keyAlias = keyAliasValue
+                keyPassword = keyPasswordValue
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName("release")
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
         }
     }
 }
