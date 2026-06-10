@@ -5,6 +5,7 @@ class AppUser {
     required this.displayName,
     required this.nick,
     required this.avatarId,
+    this.photoUrl,
   });
 
   final String id;
@@ -12,6 +13,7 @@ class AppUser {
   final String displayName;
   final String nick;
   final String avatarId;
+  final String? photoUrl;
 
   AppUser copyWith({
     String? id,
@@ -19,6 +21,7 @@ class AppUser {
     String? displayName,
     String? nick,
     String? avatarId,
+    String? photoUrl,
   }) {
     return AppUser(
       id: id ?? this.id,
@@ -26,6 +29,7 @@ class AppUser {
       displayName: displayName ?? this.displayName,
       nick: nick ?? this.nick,
       avatarId: avatarId ?? this.avatarId,
+      photoUrl: photoUrl ?? this.photoUrl,
     );
   }
 }

@@ -21,7 +21,11 @@ abstract class SessionController extends ChangeNotifier {
     required String email,
     required String password,
   });
-  Future<void> updateProfile({required String nick, required String avatarId});
+  Future<void> updateProfile({
+    required String nick,
+    required String avatarId,
+    String? photoUrl,
+  });
   Future<void> signOut();
 }
 
@@ -36,7 +40,7 @@ class FirebaseSessionController extends SessionController {
     _authSubscription = _firebaseAuth.userChanges().listen(
       (user) => unawaited(_syncFirebaseUser(user)),
     );
-    if (_enableGoogleSignIn) {
+    if (!kIsWeb && _enableGoogleSignIn) {
       unawaited(GoogleSignIn.instance.initialize());
     }
   }
@@ -161,6 +165,7 @@ class FirebaseSessionController extends SessionController {
   Future<void> updateProfile({
     required String nick,
     required String avatarId,
+    String? photoUrl,
   }) async {
     final firebaseUser = _firebaseAuth.currentUser;
     if (firebaseUser == null) {
@@ -260,6 +265,7 @@ class FirebaseSessionController extends SessionController {
       displayName: user.displayName ?? fallbackNick,
       nick: fallbackNick,
       avatarId: 'star',
+      photoUrl: user.photoURL,
     );
   }
 
@@ -378,6 +384,7 @@ class MockSessionController extends SessionController {
   Future<void> updateProfile({
     required String nick,
     required String avatarId,
+    String? photoUrl,
   }) async {
     if (_currentUser == null) return;
 
@@ -386,6 +393,7 @@ class MockSessionController extends SessionController {
     _currentUser = _currentUser!.copyWith(
       nick: nick.trim(),
       avatarId: avatarId,
+      photoUrl: photoUrl,
     );
     _setLoading(false);
   }

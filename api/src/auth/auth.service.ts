@@ -19,7 +19,10 @@ export class AuthService {
     }
 
     try {
-      return await this.firebaseAdmin.auth.verifyIdToken(token, true);
+      return await this.firebaseAdmin.auth.verifyIdToken(
+        token,
+        this.shouldCheckRevokedTokens(),
+      );
     } catch {
       throw new UnauthorizedException('Token Firebase invalido.');
     }
@@ -50,6 +53,15 @@ export class AuthService {
 
   private shouldRequireAppCheck(): boolean {
     const configuredValue = this.configService.get<string>('FIREBASE_APP_CHECK_REQUIRED');
+    if (configuredValue) {
+      return configuredValue.trim().toLowerCase() !== 'false';
+    }
+
+    return this.configService.get<string>('NODE_ENV') === 'production';
+  }
+
+  private shouldCheckRevokedTokens(): boolean {
+    const configuredValue = this.configService.get<string>('FIREBASE_AUTH_CHECK_REVOKED');
     if (configuredValue) {
       return configuredValue.trim().toLowerCase() !== 'false';
     }

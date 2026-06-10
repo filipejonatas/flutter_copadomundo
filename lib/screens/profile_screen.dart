@@ -275,7 +275,11 @@ class _UserSummary extends StatelessWidget {
       ),
       child: Row(
         children: [
-          AvatarBadge(avatarId: user.avatarId, radius: 36),
+          AvatarBadge(
+            avatarId: user.avatarId,
+            photoUrl: user.photoUrl,
+            radius: 36,
+          ),
           const SizedBox(width: 16),
           Expanded(
             child: Column(

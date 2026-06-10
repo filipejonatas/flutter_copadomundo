@@ -117,9 +117,14 @@ class TestSessionController extends SessionController {
   Future<void> updateProfile({
     required String nick,
     required String avatarId,
+    String? photoUrl,
   }) async {
     if (_currentUser == null) return;
-    _currentUser = _currentUser!.copyWith(nick: nick, avatarId: avatarId);
+    _currentUser = _currentUser!.copyWith(
+      nick: nick,
+      avatarId: avatarId,
+      photoUrl: photoUrl,
+    );
     notifyListeners();
   }
 

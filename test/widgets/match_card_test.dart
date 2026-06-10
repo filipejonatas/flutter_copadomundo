@@ -6,6 +6,24 @@ import 'package:flutter_test/flutter_test.dart';
 import '../helpers/test_helpers.dart';
 
 void main() {
+  group('countryCodeForTeam', () {
+    test('maps current API team names to their own flags', () {
+      expect(countryCodeForTeam('England'), 'GB-ENG');
+      expect(countryCodeForTeam('Scotland'), 'GB-SCT');
+      expect(countryCodeForTeam('Curaçao'), 'CW');
+      expect(countryCodeForTeam("Côte d'Ivoire"), 'CI');
+      expect(countryCodeForTeam('Bosnia-Herzegovina'), 'BA');
+      expect(countryCodeForTeam('Congo DR'), 'CD');
+      expect(countryCodeForTeam('IR Iran'), 'IR');
+      expect(countryCodeForTeam('Cabo Verde'), 'CV');
+    });
+
+    test('does not fall back to USA for unknown teams', () {
+      expect(countryCodeForTeam('Winner Group A'), isNull);
+      expect(countryCodeForTeam(''), isNull);
+    });
+  });
+
   group('MatchCard', () {
     testWidgets('should render home and away team flags correctly', (
       tester,

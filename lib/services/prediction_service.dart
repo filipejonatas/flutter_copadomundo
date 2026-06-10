@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 
 import '../models/app_user.dart';
 import '../models/match_prediction.dart';
+import 'app_check_config.dart';
 import 'api_config.dart';
 
 class PredictionService {
@@ -120,6 +121,9 @@ class PredictionService {
   Future<Map<String, String>> _secureHeaders({
     bool limitedUseAppCheck = false,
   }) async {
+    final authHeaders = await _authHeaders();
+    if (!shouldRequestAppCheckToken) return authHeaders;
+
     final appCheckToken = limitedUseAppCheck
         ? await _firebaseAppCheck.getLimitedUseToken()
         : await _firebaseAppCheck.getToken();
@@ -127,6 +131,6 @@ class PredictionService {
       throw StateError('App Check indisponivel. Tente novamente.');
     }
 
-    return {...await _authHeaders(), 'X-Firebase-AppCheck': appCheckToken};
+    return {...authHeaders, 'X-Firebase-AppCheck': appCheckToken};
   }
 }

@@ -43,6 +43,11 @@ void main() {
     await tester.tap(find.text('Salvar perfil'));
     await tester.pumpAndSettle();
 
+    await tester.scrollUntilVisible(
+      find.text('Craque Teste'),
+      -220,
+      scrollable: find.byType(Scrollable).first,
+    );
     expect(find.text('Craque Teste'), findsWidgets);
 
     await tester.tap(find.byTooltip('Ranking'));

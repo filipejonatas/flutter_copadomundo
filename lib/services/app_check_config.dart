@@ -5,6 +5,8 @@ const _webRecaptchaSiteKey = String.fromEnvironment(
   'APP_CHECK_WEB_RECAPTCHA_SITE_KEY',
 );
 
+bool get shouldRequestAppCheckToken => !kIsWeb || _webRecaptchaSiteKey.isNotEmpty;
+
 Future<void> activateAppCheck() async {
   if (kIsWeb) {
     if (_webRecaptchaSiteKey.isEmpty) {

@@ -4,22 +4,42 @@ Projeto Flutter para palpites da Copa do Mundo com login Firebase/Google.
 
 ## Rodar no navegador
 
+Para subir o backend local e o Flutter web juntos:
+
+```powershell
+.\scripts\run-local.ps1
+```
+
+Isso inicia:
+
+```text
+Backend: http://127.0.0.1:3000
+Flutter: http://127.0.0.1:4200
+```
+
+Crie um `.env` na raiz do projeto com a URL da API hospedada:
+
+```env
+API_BASE_URL=https://sua-api-do-cloud-run.run.app
+APP_CHECK_WEB_RECAPTCHA_SITE_KEY=sua-chave-recaptcha-v3-do-firebase-app-check
+```
+
 No Windows, use:
 
 ```powershell
-.\scripts\run-web.bat
+.\scripts\run-web.ps1
 ```
 
-Depois abra:
+Depois abra no navegador:
 
 ```text
 http://127.0.0.1:4200
 ```
 
-Alternativa usando `localhost`:
+Alternativa usando `localhost` como origem:
 
 ```powershell
-.\scripts\run-web-localhost.bat
+.\scripts\run-web.ps1 -HostName localhost
 ```
 
 Depois abra:

@@ -143,6 +143,7 @@ class PendingSessionController extends SessionController {
   Future<void> updateProfile({
     required String nick,
     required String avatarId,
+    String? photoUrl,
   }) async {}
 
   @override

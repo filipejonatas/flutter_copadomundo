@@ -19,11 +19,7 @@ import 'services/session_controller.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  if (Firebase.apps.isEmpty) {
-    await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
-    );
-  }
+  await _initializeFirebase();
   await activateAppCheck();
 
   runApp(
@@ -31,6 +27,18 @@ Future<void> main() async {
       child: CopaPalpiteApp(sessionController: FirebaseSessionController()),
     ),
   );
+}
+
+Future<void> _initializeFirebase() async {
+  if (Firebase.apps.isNotEmpty) return;
+
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+  } on FirebaseException catch (error) {
+    if (error.code != 'duplicate-app') rethrow;
+  }
 }
 
 /// Root app widget that wires theme, session redirects, and navigation.
