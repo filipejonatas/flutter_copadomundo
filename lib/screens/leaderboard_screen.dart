@@ -184,14 +184,29 @@ class LeaderboardTile extends StatelessWidget {
       child: Row(
         children: [
           SizedBox(
-            width: 36,
-            child: Text(
-              '#${entry.position}',
-              style: theme.textTheme.titleMedium?.copyWith(
-                color: entry.position <= 3
-                    ? AppColors.primaryAccent
-                    : AppColors.textPrimary,
-              ),
+            width: 52,
+            child: Row(
+              children: [
+                if (entry.position <= 3) ...[
+                  Tooltip(
+                    message: 'Top 3',
+                    child: PhosphorIcon(
+                      PhosphorIcons.trophy(PhosphorIconsStyle.fill),
+                      size: 14,
+                      color: AppColors.primaryAccent,
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                ],
+                Text(
+                  '#${entry.position}',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    color: entry.position <= 3
+                        ? AppColors.primaryAccent
+                        : AppColors.textPrimary,
+                  ),
+                ),
+              ],
             ),
           ),
           AvatarBadge(avatarId: entry.avatarId),

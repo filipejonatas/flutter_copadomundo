@@ -29,16 +29,21 @@ class FirebaseSessionController extends SessionController {
   FirebaseSessionController({
     FirebaseAuth? firebaseAuth,
     FirebaseDatabase? database,
+    bool enableGoogleSignIn = true,
   }) : _firebaseAuth = firebaseAuth ?? FirebaseAuth.instance,
-       _database = database ?? FirebaseDatabase.instance {
+       _database = database ?? FirebaseDatabase.instance,
+       _enableGoogleSignIn = enableGoogleSignIn {
     _authSubscription = _firebaseAuth.userChanges().listen(
       (user) => unawaited(_syncFirebaseUser(user)),
     );
-    unawaited(GoogleSignIn.instance.initialize());
+    if (_enableGoogleSignIn) {
+      unawaited(GoogleSignIn.instance.initialize());
+    }
   }
 
   final FirebaseAuth _firebaseAuth;
   final FirebaseDatabase _database;
+  final bool _enableGoogleSignIn;
   StreamSubscription<User?>? _authSubscription;
   AppUser? _currentUser;
   bool _isLoading = false;
@@ -63,6 +68,9 @@ class FirebaseSessionController extends SessionController {
       if (kIsWeb) {
         await _firebaseAuth.signInWithPopup(GoogleAuthProvider());
       } else {
+        if (!_enableGoogleSignIn) {
+          throw StateError('Google Sign-In indisponivel neste ambiente.');
+        }
         final googleUser = await GoogleSignIn.instance.authenticate();
         final googleAuth = googleUser.authentication;
 
@@ -197,7 +205,7 @@ class FirebaseSessionController extends SessionController {
 
     try {
       await _firebaseAuth.signOut();
-      if (!kIsWeb) {
+      if (!kIsWeb && _enableGoogleSignIn) {
         await GoogleSignIn.instance.signOut();
       }
     } catch (_) {

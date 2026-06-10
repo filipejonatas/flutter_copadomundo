@@ -12,18 +12,20 @@ class MatchCard extends StatelessWidget {
     this.homeScoreOverride,
     this.awayScoreOverride,
     this.footer,
+    this.onTap,
   });
 
   final MatchPrediction match;
   final int? homeScoreOverride;
   final int? awayScoreOverride;
   final Widget? footer;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final scoreText = _scoreText;
 
-    return Container(
+    final card = Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppColors.surface,
@@ -43,6 +45,17 @@ class MatchCard extends StatelessWidget {
           ),
           if (footer != null) ...[const SizedBox(height: 16), footer!],
         ],
+      ),
+    );
+
+    if (onTap == null) return card;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(AppRadii.card),
+        onTap: onTap,
+        child: card,
       ),
     );
   }

@@ -116,6 +116,20 @@ MatchPick pickFromScore(int homeScore, int awayScore) {
   return homeScore > awayScore ? MatchPick.home : MatchPick.away;
 }
 
+int calculatePredictionPoints({
+  required UserMatchPrediction prediction,
+  required int actualHomeScore,
+  required int actualAwayScore,
+}) {
+  if (prediction.homeScore == actualHomeScore &&
+      prediction.awayScore == actualAwayScore) {
+    return 3;
+  }
+
+  final actualPick = pickFromScore(actualHomeScore, actualAwayScore);
+  return prediction.pick == actualPick ? 1 : 0;
+}
+
 final mockMatches = <MatchPrediction>[
   const MatchPrediction(
     fixtureId: 2026001,

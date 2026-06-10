@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   group('MatchPrediction.isPredictionOpen', () {
     test('allows predictions before kickoff for pre-match statuses', () {
+      // Arrange
       const match = MatchPrediction(
         fixtureId: 1,
         round: 'Group Stage',
@@ -14,13 +15,17 @@ void main() {
         status: 'NS',
       );
 
-      expect(
-        match.isPredictionOpen(now: DateTime.parse('2026-06-11T18:59:59Z')),
-        isTrue,
+      // Act
+      final isOpen = match.isPredictionOpen(
+        now: DateTime.parse('2026-06-11T18:59:59Z'),
       );
+
+      // Assert
+      expect(isOpen, isTrue);
     });
 
     test('blocks predictions at kickoff', () {
+      // Arrange
       const match = MatchPrediction(
         fixtureId: 1,
         round: 'Group Stage',
@@ -31,13 +36,17 @@ void main() {
         status: 'NS',
       );
 
-      expect(
-        match.isPredictionOpen(now: DateTime.parse('2026-06-11T19:00:00Z')),
-        isFalse,
+      // Act
+      final isOpen = match.isPredictionOpen(
+        now: DateTime.parse('2026-06-11T19:00:00Z'),
       );
+
+      // Assert
+      expect(isOpen, isFalse);
     });
 
     test('blocks predictions for finished matches', () {
+      // Arrange
       const match = MatchPrediction(
         fixtureId: 1,
         round: 'Group Stage',
@@ -50,23 +59,45 @@ void main() {
         awayScore: 1,
       );
 
-      expect(
-        match.isPredictionOpen(now: DateTime.parse('2026-06-11T18:00:00Z')),
-        isFalse,
+      // Act
+      final isOpen = match.isPredictionOpen(
+        now: DateTime.parse('2026-06-11T18:00:00Z'),
       );
+
+      // Assert
+      expect(isOpen, isFalse);
     });
   });
 
   group('isValidPredictionScore', () {
     test('accepts scores from 0 to 9', () {
-      expect(isValidPredictionScore(0), isTrue);
-      expect(isValidPredictionScore(9), isTrue);
+      // Arrange
+      const minScore = 0;
+      const maxScore = 9;
+
+      // Act
+      final acceptsMin = isValidPredictionScore(minScore);
+      final acceptsMax = isValidPredictionScore(maxScore);
+
+      // Assert
+      expect(acceptsMin, isTrue);
+      expect(acceptsMax, isTrue);
     });
 
     test('rejects null, negative, and high scores', () {
-      expect(isValidPredictionScore(null), isFalse);
-      expect(isValidPredictionScore(-1), isFalse);
-      expect(isValidPredictionScore(10), isFalse);
+      // Arrange
+      const negativeScore = -1;
+      const highScore = 10;
+
+      // Act
+      final acceptsNull = isValidPredictionScore(null);
+      final acceptsNegative = isValidPredictionScore(negativeScore);
+      final acceptsHigh = isValidPredictionScore(highScore);
+
+      // Assert
+      expect(acceptsNull, isFalse);
+      expect(acceptsNegative, isFalse);
+      expect(acceptsHigh, isFalse);
     });
   });
 }

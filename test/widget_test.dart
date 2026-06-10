@@ -6,12 +6,14 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   testWidgets('login, profile and leaderboard flow works', (tester) async {
+    // Arrange
     await tester.pumpWidget(
       ProviderScope(
         child: CopaPalpiteApp(sessionController: MockSessionController()),
       ),
     );
 
+    // Act / Assert
     expect(find.text('Copa Palpite'), findsOneWidget);
     expect(find.text('Começar'), findsOneWidget);
 

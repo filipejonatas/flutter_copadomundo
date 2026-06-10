@@ -204,9 +204,12 @@ class _PredictionsScreenState extends State<PredictionsScreen> {
   }
 
   void _showMessage(String message) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
+    });
   }
 }
 
@@ -259,6 +262,8 @@ class _PredictionCardState extends State<_PredictionCard> {
   @override
   Widget build(BuildContext context) {
     final prediction = _draftPrediction;
+    final isReadOnly = widget.selectedPrediction != null;
+    final canEdit = !widget.isSaving && !widget.isLocked && !isReadOnly;
 
     return MatchCard(
       match: widget.match,
@@ -272,7 +277,7 @@ class _PredictionCardState extends State<_PredictionCard> {
                 child: _ScoreStepper(
                   label: widget.match.homeTeam,
                   value: _homeScore,
-                  enabled: !widget.isSaving && !widget.isLocked,
+                  enabled: canEdit,
                   onChanged: (value) => setState(() => _homeScore = value),
                 ),
               ),
@@ -281,7 +286,7 @@ class _PredictionCardState extends State<_PredictionCard> {
                 child: _ScoreStepper(
                   label: widget.match.awayTeam,
                   value: _awayScore,
-                  enabled: !widget.isSaving && !widget.isLocked,
+                  enabled: canEdit,
                   onChanged: (value) => setState(() => _awayScore = value),
                 ),
               ),
@@ -289,9 +294,7 @@ class _PredictionCardState extends State<_PredictionCard> {
           ),
           const SizedBox(height: 14),
           FilledButton.icon(
-            onPressed: widget.isSaving || widget.isLocked
-                ? null
-                : () => widget.onSave(prediction),
+            onPressed: canEdit ? () => widget.onSave(prediction) : null,
             icon: widget.isSaving
                 ? const SizedBox(
                     width: 18,
