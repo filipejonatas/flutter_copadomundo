@@ -26,10 +26,13 @@ class LeaderboardScreen extends StatefulWidget {
 }
 
 class _LeaderboardScreenState extends State<LeaderboardScreen> {
+  static const int _entriesPerPage = 10;
+
   late final LeaderboardService _leaderboardService =
       widget.leaderboardService ?? LeaderboardService();
   List<LeaderboardEntry> _entries = [];
   bool _isLoading = true;
+  int _pageIndex = 0;
 
   @override
   void initState() {
@@ -44,6 +47,14 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
     final topEntries = userEntry == null
         ? _entries
         : _entries.where((entry) => entry.userId != userEntry.userId).toList();
+    final totalPages = topEntries.isEmpty
+        ? 1
+        : (topEntries.length / _entriesPerPage).ceil();
+    final safePageIndex = _pageIndex.clamp(0, totalPages - 1);
+    final pagedEntries = topEntries
+        .skip(safePageIndex * _entriesPerPage)
+        .take(_entriesPerPage)
+        .toList();
 
     return Scaffold(
       appBar: AppBar(
@@ -90,13 +101,26 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                   message: 'Nenhum palpite registrado ainda.',
                 )
               else
-                for (final entry in topEntries)
+                for (final entry in pagedEntries)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 10),
                     child: LeaderboardTile(
                       entry: entry,
                     ).animate().fadeIn(duration: 220.ms).slideY(begin: .04),
                   ),
+              if (topEntries.length > _entriesPerPage) ...[
+                const SizedBox(height: 2),
+                _LeaderboardPager(
+                  currentPage: safePageIndex + 1,
+                  totalPages: totalPages,
+                  onPrevious: safePageIndex == 0
+                      ? null
+                      : () => setState(() => _pageIndex = safePageIndex - 1),
+                  onNext: safePageIndex >= totalPages - 1
+                      ? null
+                      : () => setState(() => _pageIndex = safePageIndex + 1),
+                ),
+              ],
             ],
           ],
         ),
@@ -124,12 +148,14 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
       if (!mounted) return;
       setState(() {
         _entries = entries;
+        _pageIndex = 0;
         _isLoading = false;
       });
     } catch (_) {
       if (!mounted) return;
       setState(() {
         _entries = [_fallbackEntry(user)];
+        _pageIndex = 0;
         _isLoading = false;
       });
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -154,6 +180,52 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
       predictionsCount: 0,
       exactScores: 0,
       isCurrentUser: true,
+    );
+  }
+}
+
+class _LeaderboardPager extends StatelessWidget {
+  const _LeaderboardPager({
+    required this.currentPage,
+    required this.totalPages,
+    required this.onPrevious,
+    required this.onNext,
+  });
+
+  final int currentPage;
+  final int totalPages;
+  final VoidCallback? onPrevious;
+  final VoidCallback? onNext;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(AppRadii.card),
+      ),
+      child: Row(
+        children: [
+          IconButton(
+            tooltip: 'Pagina anterior',
+            onPressed: onPrevious,
+            icon: PhosphorIcon(PhosphorIcons.caretLeft()),
+          ),
+          Expanded(
+            child: Text(
+              'Pagina $currentPage de $totalPages',
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+          ),
+          IconButton(
+            tooltip: 'Proxima pagina',
+            onPressed: onNext,
+            icon: PhosphorIcon(PhosphorIcons.caretRight()),
+          ),
+        ],
+      ),
     );
   }
 }
