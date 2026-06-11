@@ -126,7 +126,7 @@ export class PredictionsService {
   }
 
   private isPreMatchStatus(status: string): boolean {
-    return ['NS', 'TBD', 'SCHEDULED', 'NOT_STARTED', 'PRE_MATCH'].includes(
+    return ['NS', 'PRE', 'TBD', 'SCHEDULED', 'NOT_STARTED', 'PRE_MATCH'].includes(
       status.trim().toUpperCase(),
     );
   }

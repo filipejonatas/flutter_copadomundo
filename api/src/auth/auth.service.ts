@@ -40,14 +40,14 @@ export class AuthService {
 
     const result = await this.firebaseAdmin.appCheck
       .verifyToken(appCheckToken, {
-        consume: options.consume === true,
+        consume: options.consume === true && this.shouldConsumeAppCheckTokens(),
       })
       .catch(() => {
         throw new UnauthorizedException('Token App Check invalido.');
       });
 
     if (result.alreadyConsumed) {
-      throw new UnauthorizedException('Token App Check invalido.');
+      throw new UnauthorizedException('Token App Check ja consumido.');
     }
   }
 
@@ -67,5 +67,16 @@ export class AuthService {
     }
 
     return this.configService.get<string>('NODE_ENV') === 'production';
+  }
+
+  private shouldConsumeAppCheckTokens(): boolean {
+    const configuredValue = this.configService.get<string>(
+      'FIREBASE_APP_CHECK_CONSUME_TOKENS',
+    );
+    if (configuredValue) {
+      return configuredValue.trim().toLowerCase() === 'true';
+    }
+
+    return false;
   }
 }

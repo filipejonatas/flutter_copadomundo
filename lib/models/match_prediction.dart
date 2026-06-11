@@ -67,7 +67,12 @@ class MatchPrediction {
 
 bool _isPreMatchStatus(String status) {
   return switch (status.trim().toUpperCase()) {
-    'NS' || 'TBD' || 'SCHEDULED' || 'NOT_STARTED' || 'PRE_MATCH' => true,
+    'NS' ||
+    'PRE' ||
+    'TBD' ||
+    'SCHEDULED' ||
+    'NOT_STARTED' ||
+    'PRE_MATCH' => true,
     _ => false,
   };
 }

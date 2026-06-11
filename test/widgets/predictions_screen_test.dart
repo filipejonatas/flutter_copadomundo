@@ -98,7 +98,7 @@ void main() {
         _buildScreen(sessionController, predictionService),
       );
       await tester.pumpAndSettle();
-      await _scrollToConfirmButton(tester);
+      await _scrollToButton(tester, 'Confirmar palpite');
 
       // Assert
       final button = tester.widget<FilledButton>(_confirmButtonFinder());
@@ -106,7 +106,7 @@ void main() {
       expect(find.text('Palpites encerrados para este jogo.'), findsOneWidget);
     });
 
-    testWidgets('should show existing prediction in read-only mode', (
+    testWidgets('should allow updating existing prediction before kickoff', (
       tester,
     ) async {
       // Arrange
@@ -115,18 +115,64 @@ void main() {
         matches: [futureMatch],
         predictions: {futureMatch.fixtureId: savedPrediction},
       );
+      when(
+        () => predictionService.savePrediction(
+          user: any(named: 'user'),
+          match: any(named: 'match'),
+          prediction: any(named: 'prediction'),
+        ),
+      ).thenAnswer((_) async {});
 
       // Act
       await tester.pumpWidget(
         _buildScreen(sessionController, predictionService),
       );
       await tester.pumpAndSettle();
-      await _scrollToConfirmButton(tester);
+      await _scrollToButton(tester, 'Atualizar palpite');
+      await tester.tap(find.byTooltip('Aumentar').first);
+      await tester.pump();
+      await tester.tap(_confirmButtonFinder());
+      await tester.pumpAndSettle();
+
+      // Assert
+      final button = tester.widget<FilledButton>(_confirmButtonFinder());
+      expect(button.onPressed, isNotNull);
+      expect(find.text('Salvo: Brazil (3 x 1)'), findsOneWidget);
+      final captured =
+          verify(
+                () => predictionService.savePrediction(
+                  user: testUser,
+                  match: futureMatch,
+                  prediction: captureAny(named: 'prediction'),
+                ),
+              ).captured.single
+              as UserMatchPrediction;
+      expect(captured.pick, MatchPick.home);
+      expect(captured.homeScore, 3);
+      expect(captured.awayScore, 1);
+    });
+
+    testWidgets('should block updating existing prediction after kickoff', (
+      tester,
+    ) async {
+      // Arrange
+      _stubPredictions(
+        predictionService,
+        matches: [lockedMatch],
+        predictions: {lockedMatch.fixtureId: savedPrediction},
+      );
+
+      // Act
+      await tester.pumpWidget(
+        _buildScreen(sessionController, predictionService),
+      );
+      await tester.pumpAndSettle();
+      await _scrollToButton(tester, 'Atualizar palpite');
 
       // Assert
       final button = tester.widget<FilledButton>(_confirmButtonFinder());
       expect(button.onPressed, isNull);
-      expect(find.text('Salvo: Brazil (2 x 1)'), findsOneWidget);
+      expect(find.text('Palpites encerrados para este jogo.'), findsOneWidget);
     });
 
     testWidgets('should call PredictionService.savePrediction on confirm tap', (
@@ -149,7 +195,7 @@ void main() {
         _buildScreen(sessionController, predictionService),
       );
       await tester.pumpAndSettle();
-      await _scrollToConfirmButton(tester);
+      await _scrollToButton(tester, 'Confirmar palpite');
 
       // Act
       await tester.tap(_confirmButtonFinder());
@@ -180,9 +226,9 @@ Widget _buildScreen(
   );
 }
 
-Future<void> _scrollToConfirmButton(WidgetTester tester) async {
+Future<void> _scrollToButton(WidgetTester tester, String label) async {
   await tester.scrollUntilVisible(
-    find.text('Confirmar palpite'),
+    find.text(label),
     160,
     scrollable: find.byType(Scrollable).first,
   );

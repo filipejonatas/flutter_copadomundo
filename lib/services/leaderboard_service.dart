@@ -37,7 +37,7 @@ class LeaderboardService {
     );
 
     if (response.statusCode != 200) {
-      throw Exception('Backend retornou status ${response.statusCode}.');
+      throw Exception(_backendError(response));
     }
 
     final payload = jsonDecode(response.body) as List<dynamic>;
@@ -64,6 +64,12 @@ class LeaderboardService {
     }
 
     return {'Authorization': 'Bearer $token'};
+  }
+
+  String _backendError(http.Response response) {
+    final body = response.body.trim();
+    if (body.isEmpty) return 'Backend retornou status ${response.statusCode}.';
+    return 'Backend retornou status ${response.statusCode}: $body';
   }
 
   Future<Map<String, String>> _secureHeaders() async {

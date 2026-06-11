@@ -22,6 +22,7 @@ Crie um `.env` na raiz do projeto com a URL da API hospedada:
 ```env
 API_BASE_URL=https://sua-api-do-cloud-run.run.app
 APP_CHECK_WEB_RECAPTCHA_SITE_KEY=sua-chave-recaptcha-v3-do-firebase-app-check
+APP_CHECK_ANDROID_PROVIDER=play_integrity
 ```
 
 No Windows, use:
@@ -47,6 +48,54 @@ Depois abra:
 ```text
 http://localhost:4200
 ```
+
+## Rodar no Android sem API local
+
+Com `API_BASE_URL` apontando para a API hospedada no `.env`, rode:
+
+```powershell
+.\scripts\run-android.ps1
+```
+
+Se houver mais de um dispositivo/emulador conectado, liste os dispositivos:
+
+```powershell
+flutter devices
+```
+
+Depois informe o id desejado:
+
+```powershell
+.\scripts\run-android.ps1 -DeviceId "emulator-5554"
+```
+
+## Gerar APK Android
+
+Para gerar um APK release apontando para a API hospedada:
+
+```powershell
+.\scripts\build-android-release.ps1 -ApiBaseUrl "https://sua-api-do-cloud-run.run.app"
+```
+
+O APK fica em:
+
+```text
+build\app\outputs\flutter-apk\app-release.apk
+```
+
+Para gerar Android App Bundle em vez de APK:
+
+```powershell
+.\scripts\build-android-release.ps1 -ApiBaseUrl "https://sua-api-do-cloud-run.run.app" -Target appbundle
+```
+
+Em release, o App Check Android usa Play Integrity por padrao. Para testar APK instalado manualmente enquanto o Play Integrity/SHA-256 ainda nao estiver pronto no Firebase, gere um APK de diagnostico com o provider debug:
+
+```powershell
+.\scripts\build-android-release.ps1 -ApiBaseUrl "https://sua-api-do-cloud-run.run.app" -AndroidAppCheckProvider debug
+```
+
+Esse modo exige registrar o token debug no Firebase App Check e nao deve ser usado para publicacao.
 
 ## Getting Started
 

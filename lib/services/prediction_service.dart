@@ -31,7 +31,7 @@ class PredictionService {
     final response = await _httpClient.get(uri);
 
     if (response.statusCode != 200) {
-      throw Exception('Backend retornou status ${response.statusCode}.');
+      throw Exception(_backendError(response));
     }
 
     final payload = jsonDecode(response.body) as List<dynamic>;
@@ -51,7 +51,7 @@ class PredictionService {
     );
 
     if (response.statusCode != 200) {
-      throw Exception('Backend retornou status ${response.statusCode}.');
+      throw Exception(_backendError(response));
     }
 
     return parseUserPredictions(jsonDecode(response.body));
@@ -92,10 +92,7 @@ class PredictionService {
 
     final response = await _httpClient.post(
       _apiBaseUri.resolve('/predictions'),
-      headers: {
-        ...await _secureHeaders(limitedUseAppCheck: true),
-        'Content-Type': 'application/json',
-      },
+      headers: {...await _secureHeaders(), 'Content-Type': 'application/json'},
       body: jsonEncode({
         'fixtureId': match.fixtureId,
         'pick': pickToStorageValue(prediction.pick),
@@ -105,7 +102,7 @@ class PredictionService {
     );
 
     if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw Exception('Backend retornou status ${response.statusCode}.');
+      throw Exception(_backendError(response));
     }
   }
 
@@ -116,6 +113,12 @@ class PredictionService {
     }
 
     return {'Authorization': 'Bearer $token'};
+  }
+
+  String _backendError(http.Response response) {
+    final body = response.body.trim();
+    if (body.isEmpty) return 'Backend retornou status ${response.statusCode}.';
+    return 'Backend retornou status ${response.statusCode}: $body';
   }
 
   Future<Map<String, String>> _secureHeaders({

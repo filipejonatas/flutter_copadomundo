@@ -29,7 +29,7 @@ export class PredictionsController {
     @Ip() ip: string,
   ) {
     this.predictionRateLimit.checkIp(ip);
-    await this.authService.verifyAppCheckHeader(appCheckToken, { consume: true });
+    await this.authService.verifyAppCheckHeader(appCheckToken);
     const user = await this.authService.verifyAuthorizationHeader(authorization);
     const fixtureId = this.predictionsService.validFixtureId(body.fixtureId);
     this.predictionRateLimit.checkUser(user.uid, ip, fixtureId);

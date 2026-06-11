@@ -56,10 +56,7 @@ void main() {
       expect(capturedRequest.method, 'POST');
       expect(capturedRequest.url.path, '/predictions');
       expect(capturedRequest.headers['Authorization'], 'Bearer id-token');
-      expect(
-        capturedRequest.headers['X-Firebase-AppCheck'],
-        'limited-app-check-token',
-      );
+      expect(capturedRequest.headers['X-Firebase-AppCheck'], 'app-check-token');
       expect(jsonDecode(capturedRequest.body), {
         'fixtureId': 101,
         'pick': 'home',

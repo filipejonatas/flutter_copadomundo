@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
@@ -131,38 +130,39 @@ class _PredictionsScreenState extends State<PredictionsScreen> {
     final user = widget.sessionController.currentUser;
     if (user == null) return;
 
+    List<MatchPrediction> matches;
     try {
-      final matches = await _predictionService.loadMatches();
-      final predictions = await _predictionService.loadUserPredictions(user);
+      matches = await _predictionService.loadMatches();
+    } catch (error) {
       if (!mounted) return;
       setState(() {
-        _matches = matches;
+        _matches = [];
         _dayIndex = 0;
-        _picks
-          ..clear()
-          ..addAll(predictions);
+        _picks.clear();
         _isLoading = false;
       });
-    } catch (_) {
-      if (!mounted) return;
-      if (kReleaseMode) {
-        setState(() {
-          _matches = [];
-          _dayIndex = 0;
-          _isLoading = false;
-        });
-        _showMessage('Nao foi possivel conectar ao backend.');
-        return;
-      }
-      setState(() {
-        _matches = mockMatches;
-        _dayIndex = 0;
-        _isLoading = false;
-      });
-      _showMessage(
-        'Nao foi possivel conectar ao backend. Usando jogos mockados.',
-      );
+      _showMessage('Nao foi possivel carregar jogos da API.');
+      debugPrint('Falha ao carregar jogos: $error');
+      return;
     }
+
+    Map<int, UserMatchPrediction> predictions = {};
+    try {
+      predictions = await _predictionService.loadUserPredictions(user);
+    } catch (error) {
+      debugPrint('Falha ao carregar palpites do usuario: $error');
+      _showMessage('Nao foi possivel carregar seus palpites salvos.');
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _matches = matches;
+      _dayIndex = 0;
+      _picks
+        ..clear()
+        ..addAll(predictions);
+      _isLoading = false;
+    });
   }
 
   Future<void> _savePrediction(
@@ -187,7 +187,8 @@ class _PredictionsScreenState extends State<PredictionsScreen> {
         _picks[match.fixtureId] = prediction;
       });
       _showMessage('Palpite salvo.');
-    } catch (_) {
+    } catch (error) {
+      debugPrint('Falha ao salvar palpite: $error');
       if (!mounted) return;
       _showMessage('Nao foi possivel salvar o palpite.');
     } finally {
@@ -262,8 +263,8 @@ class _PredictionCardState extends State<_PredictionCard> {
   @override
   Widget build(BuildContext context) {
     final prediction = _draftPrediction;
-    final isReadOnly = widget.selectedPrediction != null;
-    final canEdit = !widget.isSaving && !widget.isLocked && !isReadOnly;
+    final hasSavedPrediction = widget.selectedPrediction != null;
+    final canEdit = !widget.isSaving && !widget.isLocked;
 
     return MatchCard(
       match: widget.match,
@@ -303,7 +304,11 @@ class _PredictionCardState extends State<_PredictionCard> {
                   )
                 : PhosphorIcon(PhosphorIcons.checkCircle()),
             label: Text(
-              widget.isSaving ? 'Confirmando...' : 'Confirmar palpite',
+              widget.isSaving
+                  ? 'Confirmando...'
+                  : hasSavedPrediction
+                  ? 'Atualizar palpite'
+                  : 'Confirmar palpite',
             ),
           ),
           if (widget.isLocked) ...[
@@ -393,7 +398,7 @@ class _ScoreStepper extends StatelessWidget {
                 onTap: () => onChanged(value - 1),
               ),
               SizedBox(
-                width: 44,
+                width: 36,
                 child: Text(
                   '$value',
                   textAlign: TextAlign.center,
@@ -433,6 +438,9 @@ class _StepButton extends StatelessWidget {
       tooltip: tooltip,
       onPressed: enabled ? onTap : null,
       style: IconButton.styleFrom(
+        minimumSize: const Size.square(40),
+        fixedSize: const Size.square(40),
+        padding: EdgeInsets.zero,
         backgroundColor: AppColors.background,
         foregroundColor: AppColors.primaryAccent,
         disabledForegroundColor: AppColors.textSecondary,
