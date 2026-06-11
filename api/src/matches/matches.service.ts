@@ -121,7 +121,11 @@ export class MatchesService {
   }
 
   private normalizeKey(value?: string): string {
-    return (value ?? '').trim().replace(/^['"]|['"]$/g, '');
+    return (value ?? '')
+      .trim()
+      .replace(/^['"]|['"]$/g, '')
+      .replace(/^Bearer\s+/i, '')
+      .trim();
   }
 
   private sortByKickoff(matches: WorldCupMatch[]): WorldCupMatch[] {
