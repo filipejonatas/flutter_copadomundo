@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../models/app_user.dart';
-import '../models/avatar_option.dart';
 import '../models/leaderboard_entry.dart';
 import '../models/match_prediction.dart';
 import '../services/leaderboard_service.dart';
 import '../services/prediction_service.dart';
 import '../services/session_controller.dart';
 import '../theme/app_theme.dart';
-import '../widgets/avatar_badge.dart';
 import '../widgets/logout_circle_button.dart';
 
 /// Profile screen with avatar, editable identity, stats, and history.
@@ -34,15 +34,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
   LeaderboardEntry? _userStats;
   List<_PredictionHistoryItem> _history = [];
   bool _isStatsLoading = true;
+  bool _isPhotoUploading = false;
   String? _statsError;
-  late String _selectedAvatarId;
 
   @override
   void initState() {
     super.initState();
     final user = widget.sessionController.currentUser!;
     _nickController = TextEditingController(text: user.nick);
-    _selectedAvatarId = user.avatarId;
     _loadProfileStats(user);
   }
 
@@ -75,6 +74,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
           padding: const EdgeInsets.fromLTRB(20, 10, 20, 120),
           children: [
             _UserSummary(user: user),
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              onPressed: _isPhotoUploading || widget.sessionController.isLoading
+                  ? null
+                  : _pickAndUploadPhoto,
+              icon: _isPhotoUploading
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : PhosphorIcon(PhosphorIcons.camera()),
+              label: Text(
+                _isPhotoUploading ? 'Enviando foto...' : 'Alterar foto',
+              ),
+            ),
             const SizedBox(height: 16),
             _StatsGrid(entry: _userStats, isLoading: _isStatsLoading),
             if (_statsError != null) ...[
@@ -91,35 +106,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 hintText: 'Como voce quer aparecer?',
                 counterText: '',
               ),
-            ),
-            const SizedBox(height: 20),
-            Text('Avatar', style: theme.textTheme.titleMedium),
-            const SizedBox(height: 10),
-            Wrap(
-              spacing: 10,
-              runSpacing: 10,
-              children: avatarOptions.map((avatar) {
-                final isSelected = avatar.id == _selectedAvatarId;
-                return ChoiceChip(
-                  selected: isSelected,
-                  onSelected: (_) =>
-                      setState(() => _selectedAvatarId = avatar.id),
-                  label: PhosphorIcon(
-                    avatar.icon,
-                    color: avatar.color,
-                    size: 26,
-                  ),
-                  showCheckmark: false,
-                  padding: const EdgeInsets.all(10),
-                  backgroundColor: AppColors.surface,
-                  selectedColor: AppColors.primaryAccent.withValues(alpha: .14),
-                  side: BorderSide(
-                    color: isSelected
-                        ? AppColors.primaryAccent
-                        : Colors.white.withValues(alpha: .08),
-                  ),
-                );
-              }).toList(),
             ),
             const SizedBox(height: 24),
             FilledButton.icon(
@@ -181,7 +167,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     await widget.sessionController.updateProfile(
       nick: nick,
-      avatarId: _selectedAvatarId,
+      avatarId: widget.sessionController.currentUser!.avatarId,
     );
 
     if (!mounted) return;
@@ -197,6 +183,80 @@ class _ProfileScreenState extends State<ProfileScreen> {
     ).showSnackBar(const SnackBar(content: Text('Perfil atualizado.')));
     setState(() {});
     await _loadProfileStats(widget.sessionController.currentUser!);
+  }
+
+  Future<void> _pickAndUploadPhoto() async {
+    final user = widget.sessionController.currentUser;
+    if (user == null) return;
+
+    try {
+      final picker = ImagePicker();
+      final image = await picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 800,
+        maxHeight: 800,
+        imageQuality: 82,
+      );
+      if (image == null) return;
+
+      setState(() => _isPhotoUploading = true);
+      final bytes = await image.readAsBytes();
+      final extension = _imageExtension(image.name);
+      final fileName = '${DateTime.now().millisecondsSinceEpoch}.$extension';
+      final reference = FirebaseStorage.instance
+          .ref()
+          .child('profile_photos')
+          .child(user.id)
+          .child(fileName);
+
+      await reference.putData(
+        bytes,
+        SettableMetadata(contentType: _contentType(extension)),
+      );
+      final photoUrl = await reference.getDownloadURL();
+
+      await widget.sessionController.updateProfile(
+        nick: _nickController.text.trim(),
+        avatarId: user.avatarId,
+        photoUrl: photoUrl,
+      );
+
+      if (!mounted) return;
+      if (widget.sessionController.errorMessage != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(widget.sessionController.errorMessage!)),
+        );
+        return;
+      }
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Foto atualizada.')));
+      setState(() {});
+    } catch (error) {
+      debugPrint('Falha ao enviar foto de perfil: $error');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Nao foi possivel enviar a foto.')),
+      );
+    } finally {
+      if (mounted) setState(() => _isPhotoUploading = false);
+    }
+  }
+
+  String _imageExtension(String fileName) {
+    final lowerName = fileName.toLowerCase();
+    if (lowerName.endsWith('.png')) return 'png';
+    if (lowerName.endsWith('.webp')) return 'webp';
+    return 'jpg';
+  }
+
+  String _contentType(String extension) {
+    return switch (extension) {
+      'png' => 'image/png',
+      'webp' => 'image/webp',
+      _ => 'image/jpeg',
+    };
   }
 
   Future<void> _loadProfileStats(AppUser user) async {
@@ -275,11 +335,7 @@ class _UserSummary extends StatelessWidget {
       ),
       child: Row(
         children: [
-          AvatarBadge(
-            avatarId: user.avatarId,
-            photoUrl: user.photoUrl,
-            radius: 36,
-          ),
+          _ProfilePhoto(photoUrl: user.photoUrl, radius: 36),
           const SizedBox(width: 16),
           Expanded(
             child: Column(
@@ -298,6 +354,33 @@ class _UserSummary extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _ProfilePhoto extends StatelessWidget {
+  const _ProfilePhoto({required this.photoUrl, required this.radius});
+
+  final String? photoUrl;
+  final double radius;
+
+  @override
+  Widget build(BuildContext context) {
+    final imageUrl = photoUrl?.trim();
+
+    return CircleAvatar(
+      radius: radius,
+      backgroundColor: AppColors.surfaceElevated,
+      foregroundImage: imageUrl == null || imageUrl.isEmpty
+          ? null
+          : NetworkImage(imageUrl),
+      child: imageUrl == null || imageUrl.isEmpty
+          ? PhosphorIcon(
+              PhosphorIcons.userCircle(),
+              color: AppColors.textSecondary,
+              size: radius,
+            )
+          : null,
     );
   }
 }

@@ -149,6 +149,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
       userId: user.id,
       nick: user.nick,
       avatarId: user.avatarId,
+      photoUrl: user.photoUrl,
       points: 0,
       predictionsCount: 0,
       exactScores: 0,
@@ -209,7 +210,7 @@ class LeaderboardTile extends StatelessWidget {
               ],
             ),
           ),
-          AvatarBadge(avatarId: entry.avatarId),
+          AvatarBadge(avatarId: entry.avatarId, photoUrl: entry.photoUrl),
           const SizedBox(width: 12),
           Expanded(
             child: Column(

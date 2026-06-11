@@ -40,6 +40,7 @@ void main() {
                 'userId': 'u1',
                 'nick': 'Top',
                 'avatarId': 'cup',
+                'photoUrl': 'https://example.test/top.jpg',
                 'points': 10,
                 'predictionsCount': 3,
                 'exactScores': 2,
@@ -65,6 +66,7 @@ void main() {
 
       // Assert
       expect(entries.map((entry) => entry.points), [10, 8]);
+      expect(entries.first.photoUrl, 'https://example.test/top.jpg');
       expect(entries.last.isCurrentUser, isTrue);
     });
 

@@ -179,9 +179,14 @@ class FirebaseSessionController extends SessionController {
 
     try {
       await firebaseUser.updateDisplayName(nick.trim());
+      final effectivePhotoUrl = photoUrl ?? firebaseUser.photoURL;
+      if (effectivePhotoUrl != null && effectivePhotoUrl.trim().isNotEmpty) {
+        await firebaseUser.updatePhotoURL(effectivePhotoUrl.trim());
+      }
       await _userReference(firebaseUser.uid).update({
         'nick': nick.trim(),
         'avatarId': avatarId,
+        'photoUrl': effectivePhotoUrl?.trim(),
         'email': firebaseUser.email ?? '',
         'displayName': firebaseUser.displayName ?? nick.trim(),
         'updatedAt': ServerValue.timestamp,
@@ -190,6 +195,7 @@ class FirebaseSessionController extends SessionController {
         displayName: nick.trim(),
         nick: nick.trim(),
         avatarId: avatarId,
+        photoUrl: effectivePhotoUrl,
       );
       notifyListeners();
     } on FirebaseException catch (error) {
@@ -278,6 +284,7 @@ class FirebaseSessionController extends SessionController {
       await reference.set({
         'nick': fallback.nick,
         'avatarId': fallback.avatarId,
+        'photoUrl': fallback.photoUrl,
         'email': fallback.email,
         'displayName': fallback.displayName,
         'createdAt': ServerValue.timestamp,
@@ -297,6 +304,9 @@ class FirebaseSessionController extends SessionController {
       avatarId: (data['avatarId'] as String?)?.trim().isNotEmpty == true
           ? (data['avatarId'] as String).trim()
           : fallback.avatarId,
+      photoUrl: (data['photoUrl'] as String?)?.trim().isNotEmpty == true
+          ? (data['photoUrl'] as String).trim()
+          : fallback.photoUrl,
     );
   }
 

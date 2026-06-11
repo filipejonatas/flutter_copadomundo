@@ -14,6 +14,7 @@ export interface LeaderboardEntry {
   userId: string;
   nick: string;
   avatarId: string;
+  photoUrl?: string;
   points: number;
   predictionsCount: number;
   exactScores: number;
@@ -60,14 +61,16 @@ export class LeaderboardService {
       const score = this.calculateScore(userPredictions, finishedMatches);
       const nick = this.stringValue(profile.nick) ?? 'Palpiteiro';
       const avatarId = this.stringValue(profile.avatarId) ?? 'star';
+      const photoUrl = this.stringValue(profile.photoUrl);
 
-      await this.persistScore(userId, nick, avatarId, score);
+      await this.persistScore(userId, nick, avatarId, photoUrl, score);
 
       entries.push({
         position: 0,
         userId,
         nick,
         avatarId,
+        photoUrl,
         points: score.points,
         predictionsCount: score.predictionsCount,
         exactScores: score.exactScores,
@@ -159,12 +162,14 @@ export class LeaderboardService {
     userId: string,
     nick: string,
     avatarId: string,
+    photoUrl: string | undefined,
     score: ConsolidatedScore,
   ) {
     return this.firebaseAdmin.database.ref(`scores/${userId}`).set({
       userId,
       nick,
       avatarId,
+      photoUrl,
       points: score.points,
       predictionsCount: score.predictionsCount,
       hits: score.hits,
