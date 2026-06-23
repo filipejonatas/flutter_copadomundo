@@ -1,5 +1,5 @@
-import 'package:country_flags/country_flags.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 import '../models/match_prediction.dart';
 import '../theme/app_theme.dart';
@@ -135,31 +135,51 @@ class TeamFlag extends StatelessWidget {
     final code = countryCodeForTeam(teamName);
 
     if (code == null) {
-      return CircleAvatar(
-        radius: size / 2,
-        backgroundColor: AppColors.surfaceElevated,
-        child: Text(
-          _fallbackFlagLabel(teamName),
-          style: TextStyle(
-            color: AppColors.textSecondary,
-            fontSize: size * .28,
-            fontWeight: FontWeight.w900,
-          ),
-        ),
-      );
+      return _FlagFallback(teamName: teamName, size: size);
     }
 
+    return SizedBox(
+      width: size,
+      height: size,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          _FlagFallback(teamName: teamName, size: size),
+          ClipOval(
+            child: SvgPicture.asset(
+              flagAssetPathForCode(code),
+              width: size,
+              height: size,
+              fit: BoxFit.cover,
+              placeholderBuilder: (_) =>
+                  _FlagFallback(teamName: teamName, size: size),
+              errorBuilder: (_, _, _) =>
+                  _FlagFallback(teamName: teamName, size: size),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FlagFallback extends StatelessWidget {
+  const _FlagFallback({required this.teamName, required this.size});
+
+  final String teamName;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
     return CircleAvatar(
       radius: size / 2,
       backgroundColor: AppColors.surfaceElevated,
-      child: ClipOval(
-        child: SizedBox(
-          width: size,
-          height: size,
-          child: CountryFlag.fromCountryCode(
-            code,
-            theme: ImageTheme(width: size, height: size, shape: const Circle()),
-          ),
+      child: Text(
+        _fallbackFlagLabel(teamName),
+        style: TextStyle(
+          color: AppColors.textSecondary,
+          fontSize: size * .28,
+          fontWeight: FontWeight.w900,
         ),
       ),
     );
@@ -211,6 +231,9 @@ class MatchStatusChip extends StatelessWidget {
     );
   }
 }
+
+String flagAssetPathForCode(String code) =>
+    'assets/flags/${code.toLowerCase()}.svg';
 
 /// Maps national team names to ISO 3166 country codes for flags.
 String? countryCodeForTeam(String teamName) {

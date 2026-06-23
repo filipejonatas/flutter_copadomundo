@@ -1,14 +1,19 @@
 import { BadGatewayException, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { FirebaseAdminService } from '../firebase-admin.service';
 import { WorldCupMatch } from './world-cup-match';
 
 @Injectable()
 export class MatchesService {
   private readonly logger = new Logger(MatchesService.name);
+  private readonly persistentCachePath = 'cache/worldCup2026Matches';
   private cachedMatches: WorldCupMatch[] | null = null;
   private cachedMatchesAt = 0;
 
-  constructor(private readonly configService: ConfigService) {}
+  constructor(
+    private readonly configService: ConfigService,
+    private readonly firebaseAdmin: FirebaseAdminService,
+  ) {}
 
   async getWorldCup2026Matches(): Promise<WorldCupMatch[]> {
     const wcKey = this.configService.get<string>('WC2026_API_KEY');
@@ -50,24 +55,10 @@ export class MatchesService {
       return this.getMockWorldCup2026Matches();
     }
 
-    const matches = this.sortByKickoff(
-      payload.map((m) => {
-        const kickoff = m.kickoff_utc ?? m.kickoff ?? new Date().toISOString();
-        return {
-          fixtureId: m.id ?? m.match_number ?? 0,
-          round: (m.round ?? '') + (m.group_name ? ` - ${m.group_name}` : ''),
-          kickoffLabel: this.formatKickoffLabel(kickoff),
-          kickoffAt: kickoff,
-          homeTeam: m.home_team ?? '',
-          awayTeam: m.away_team ?? '',
-          status: m.phase ?? m.status ?? '',
-          homeScore: this.resolveScore(m, 'home'),
-          awayScore: this.resolveScore(m, 'away'),
-        } as WorldCupMatch;
-      }),
-    );
+    const matches = this.toWorldCupMatches(payload);
     this.cachedMatches = matches;
     this.cachedMatchesAt = Date.now();
+    await this.savePersistentMatchesCache(matches);
     return matches;
   }
 
@@ -116,8 +107,81 @@ export class MatchesService {
       return this.cachedMatches as Wc2026MatchesResponse;
     }
 
+    const persistentMatches = await this.loadPersistentMatchesCache();
+    if (persistentMatches.length > 0) {
+      this.logger.warn('Usando cache persistente do Firebase para jogos da Copa.');
+      this.cachedMatches = persistentMatches;
+      this.cachedMatchesAt = Date.now();
+      return persistentMatches as Wc2026MatchesResponse;
+    }
+
     this.logger.error('Falha ao consultar WC2026 API apos novas tentativas.', lastError);
     throw new BadGatewayException('Nao foi possivel consultar a API de jogos.');
+  }
+
+  private toWorldCupMatches(payload: Wc2026MatchesResponse): WorldCupMatch[] {
+    return this.sortByKickoff(
+      payload.map((m) => {
+        if (this.isWorldCupMatch(m)) return m;
+
+        const kickoff = m.kickoff_utc ?? m.kickoff ?? new Date().toISOString();
+        return {
+          fixtureId: m.id ?? m.match_number ?? 0,
+          round: (m.round ?? '') + (m.group_name ? ` - ${m.group_name}` : ''),
+          kickoffLabel: this.formatKickoffLabel(kickoff),
+          kickoffAt: kickoff,
+          homeTeam: m.home_team ?? '',
+          awayTeam: m.away_team ?? '',
+          status: m.phase ?? m.status ?? '',
+          homeScore: this.resolveScore(m, 'home'),
+          awayScore: this.resolveScore(m, 'away'),
+        };
+      }),
+    );
+  }
+
+  private async savePersistentMatchesCache(matches: WorldCupMatch[]): Promise<void> {
+    try {
+      await this.firebaseAdmin.database.ref(this.persistentCachePath).set({
+        updatedAt: Date.now(),
+        matches: matches.map((match) => ({
+          fixtureId: match.fixtureId,
+          round: match.round,
+          kickoffLabel: match.kickoffLabel,
+          kickoffAt: match.kickoffAt,
+          homeTeam: match.homeTeam,
+          awayTeam: match.awayTeam,
+          status: match.status,
+          ...(match.homeScore === undefined ? {} : { homeScore: match.homeScore }),
+          ...(match.awayScore === undefined ? {} : { awayScore: match.awayScore }),
+        })),
+      });
+    } catch (error) {
+      this.logger.warn(
+        `Nao foi possivel salvar cache persistente de jogos: ${this.errorMessage(error)}`,
+      );
+    }
+  }
+
+  private async loadPersistentMatchesCache(): Promise<WorldCupMatch[]> {
+    const snapshot = await this.firebaseAdmin.database
+      .ref(this.persistentCachePath)
+      .get()
+      .catch((error: unknown) => {
+        this.logger.warn(
+          `Nao foi possivel carregar cache persistente de jogos: ${this.errorMessage(error)}`,
+        );
+        return null;
+      });
+    if (snapshot === null) return [];
+
+    const value = snapshot.val() as { matches?: unknown } | null;
+    if (!value || !Array.isArray(value.matches)) return [];
+
+    const matches = value.matches.filter((item): item is WorldCupMatch =>
+      this.isWorldCupMatch(item),
+    );
+    return this.sortByKickoff(matches);
   }
 
   private getMockWorldCup2026Matches(): WorldCupMatch[] {
@@ -206,6 +270,23 @@ export class MatchesService {
   private errorMessage(error: unknown): string {
     if (error instanceof Error) return error.message;
     return String(error);
+  }
+
+  private isWorldCupMatch(value: unknown): value is WorldCupMatch {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+      return false;
+    }
+
+    const item = value as Partial<WorldCupMatch>;
+    return (
+      typeof item.fixtureId === 'number' &&
+      typeof item.round === 'string' &&
+      typeof item.kickoffLabel === 'string' &&
+      typeof item.kickoffAt === 'string' &&
+      typeof item.homeTeam === 'string' &&
+      typeof item.awayTeam === 'string' &&
+      typeof item.status === 'string'
+    );
   }
 
   private positiveInt(value: string | undefined, fallback: number): number {

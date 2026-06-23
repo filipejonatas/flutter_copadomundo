@@ -7,6 +7,7 @@ import '../models/match_prediction.dart';
 import '../services/prediction_service.dart';
 import '../services/session_controller.dart';
 import '../theme/app_theme.dart';
+import '../utils/match_day_selector.dart';
 import '../widgets/logout_circle_button.dart';
 import '../widgets/match_card.dart';
 
@@ -122,8 +123,12 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   List<_MatchGroup> get _matchGroups {
+    return _buildMatchGroups(_matches);
+  }
+
+  List<_MatchGroup> _buildMatchGroups(List<MatchPrediction> matches) {
     final groups = <String, List<MatchPrediction>>{};
-    for (final match in _matches) {
+    for (final match in matches) {
       groups.putIfAbsent(_dayLabel(match), () => []).add(match);
     }
 
@@ -137,9 +142,12 @@ class _HomeScreenState extends State<HomeScreen> {
     try {
       final matches = await _predictionService.loadMatches();
       if (!mounted) return;
+      final groups = _buildMatchGroups(matches);
       setState(() {
         _matches = matches;
-        _dayIndex = 0;
+        _dayIndex = initialMatchDayIndex(
+          groups.map((group) => group.matches).toList(),
+        );
         _isLoading = false;
       });
     } catch (_) {
@@ -152,9 +160,12 @@ class _HomeScreenState extends State<HomeScreen> {
         });
         return;
       }
+      final groups = _buildMatchGroups(mockMatches);
       setState(() {
         _matches = mockMatches;
-        _dayIndex = 0;
+        _dayIndex = initialMatchDayIndex(
+          groups.map((group) => group.matches).toList(),
+        );
         _isLoading = false;
       });
     }

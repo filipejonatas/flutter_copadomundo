@@ -7,6 +7,7 @@ import '../models/match_prediction.dart';
 import '../services/prediction_service.dart';
 import '../services/session_controller.dart';
 import '../theme/app_theme.dart';
+import '../utils/match_day_selector.dart';
 import '../widgets/logout_circle_button.dart';
 import '../widgets/match_card.dart';
 
@@ -116,8 +117,12 @@ class _PredictionsScreenState extends State<PredictionsScreen> {
   }
 
   List<_MatchDay> get _matchDays {
+    return _buildMatchDays(_matches);
+  }
+
+  List<_MatchDay> _buildMatchDays(List<MatchPrediction> matches) {
     final days = <String, List<MatchPrediction>>{};
-    for (final match in _matches) {
+    for (final match in matches) {
       days.putIfAbsent(_dayLabel(match), () => []).add(match);
     }
 
@@ -155,9 +160,12 @@ class _PredictionsScreenState extends State<PredictionsScreen> {
     }
 
     if (!mounted) return;
+    final matchDays = _buildMatchDays(matches);
     setState(() {
       _matches = matches;
-      _dayIndex = 0;
+      _dayIndex = initialMatchDayIndex(
+        matchDays.map((day) => day.matches).toList(),
+      );
       _picks
         ..clear()
         ..addAll(predictions);

@@ -6,6 +6,7 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import '../models/match_prediction.dart';
 import '../services/prediction_service.dart';
 import '../theme/app_theme.dart';
+import '../utils/match_day_selector.dart';
 import '../widgets/match_card.dart';
 
 /// Matches screen showing official scores and status cards by date.
@@ -90,8 +91,12 @@ class _ResultsScreenState extends State<ResultsScreen> {
   }
 
   List<_MatchDay> get _matchDays {
+    return _buildMatchDays(_matches);
+  }
+
+  List<_MatchDay> _buildMatchDays(List<MatchPrediction> matches) {
     final days = <String, List<MatchPrediction>>{};
-    for (final match in _matches) {
+    for (final match in matches) {
       days.putIfAbsent(_dayLabel(match), () => []).add(match);
     }
 
@@ -104,9 +109,12 @@ class _ResultsScreenState extends State<ResultsScreen> {
     try {
       final matches = await _predictionService.loadMatches();
       if (!mounted) return;
+      final matchDays = _buildMatchDays(matches);
       setState(() {
         _matches = matches;
-        _dayIndex = 0;
+        _dayIndex = initialMatchDayIndex(
+          matchDays.map((day) => day.matches).toList(),
+        );
         _isLoading = false;
       });
     } catch (_) {
@@ -120,9 +128,12 @@ class _ResultsScreenState extends State<ResultsScreen> {
         _showMessage('Nao foi possivel conectar ao backend.');
         return;
       }
+      final matchDays = _buildMatchDays(mockMatches);
       setState(() {
         _matches = mockMatches;
-        _dayIndex = 0;
+        _dayIndex = initialMatchDayIndex(
+          matchDays.map((day) => day.matches).toList(),
+        );
         _isLoading = false;
       });
       _showMessage(

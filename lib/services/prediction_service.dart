@@ -18,15 +18,28 @@ class PredictionService {
   }) : _firebaseAuth = firebaseAuth ?? FirebaseAuth.instance,
        _firebaseAppCheck = firebaseAppCheck ?? FirebaseAppCheck.instance,
        _httpClient = httpClient ?? http.Client(),
-       _apiBaseUri = resolveApiBaseUri(apiBaseUrl);
+       _apiBaseUri = resolveApiBaseUri(apiBaseUrl),
+       _cacheMatches = httpClient == null;
 
   final FirebaseAuth _firebaseAuth;
   final FirebaseAppCheck _firebaseAppCheck;
   final http.Client _httpClient;
   final String apiBaseUrl;
   final Uri _apiBaseUri;
+  final bool _cacheMatches;
+
+  static const Duration _matchesCacheTtl = Duration(minutes: 5);
+  static final Map<String, _CachedMatches> _matchesCache = {};
 
   Future<List<MatchPrediction>> loadMatches() async {
+    final cacheKey = _apiBaseUri.toString();
+    final cached = _matchesCache[cacheKey];
+    if (_cacheMatches &&
+        cached != null &&
+        DateTime.now().difference(cached.createdAt) < _matchesCacheTtl) {
+      return cached.matches;
+    }
+
     final uri = _apiBaseUri.resolve('/matches/world-cup-2026');
     final response = await _httpClient.get(uri);
 
@@ -35,9 +48,13 @@ class PredictionService {
     }
 
     final payload = jsonDecode(response.body) as List<dynamic>;
-    return payload
+    final matches = payload
         .map((item) => MatchPrediction.fromJson(item as Map<String, dynamic>))
         .toList();
+    if (_cacheMatches) {
+      _matchesCache[cacheKey] = _CachedMatches(matches, DateTime.now());
+    }
+    return matches;
   }
 
   Future<Map<int, UserMatchPrediction>> loadUserPredictions(
@@ -136,4 +153,11 @@ class PredictionService {
 
     return {...authHeaders, 'X-Firebase-AppCheck': appCheckToken};
   }
+}
+
+class _CachedMatches {
+  const _CachedMatches(this.matches, this.createdAt);
+
+  final List<MatchPrediction> matches;
+  final DateTime createdAt;
 }
