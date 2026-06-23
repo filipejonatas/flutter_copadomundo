@@ -1,9 +1,13 @@
-import { Injectable } from '@nestjs/common';
+import { BadGatewayException, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { WorldCupMatch } from './world-cup-match';
 
 @Injectable()
 export class MatchesService {
+  private readonly logger = new Logger(MatchesService.name);
+  private cachedMatches: WorldCupMatch[] | null = null;
+  private cachedMatchesAt = 0;
+
   constructor(private readonly configService: ConfigService) {}
 
   async getWorldCup2026Matches(): Promise<WorldCupMatch[]> {
@@ -18,27 +22,35 @@ export class MatchesService {
     }
 
     const configuredWcKey = this.normalizeKey(wcKey);
+    const cacheTtlMs = this.positiveInt(
+      this.configService.get<string>('WC2026_CACHE_TTL_SECONDS'),
+      300,
+    ) * 1000;
+    if (
+      this.cachedMatches !== null &&
+      Date.now() - this.cachedMatchesAt < cacheTtlMs
+    ) {
+      return this.cachedMatches;
+    }
+
     const baseUrl =
       this.configService.get<string>('WC2026_BASE_URL') ??
       'https://api.wc2026api.com';
     const url = new URL('/matches', baseUrl);
 
-    const response = await fetch(url, {
-      headers: {
-        Authorization: `Bearer ${configuredWcKey}`,
-      },
-    });
-
-    if (!response.ok) {
-      throw new Error(`WC2026 API respondeu status ${response.status}`);
-    }
-
-    const payload = (await response.json()) as Wc2026MatchesResponse;
+    const payload = await this.fetchWc2026Matches(
+      url,
+      configuredWcKey,
+      this.positiveInt(
+        this.configService.get<string>('WC2026_FETCH_TIMEOUT_MS'),
+        7000,
+      ),
+    );
     if (!Array.isArray(payload)) {
       return this.getMockWorldCup2026Matches();
     }
 
-    return this.sortByKickoff(
+    const matches = this.sortByKickoff(
       payload.map((m) => {
         const kickoff = m.kickoff_utc ?? m.kickoff ?? new Date().toISOString();
         return {
@@ -54,6 +66,58 @@ export class MatchesService {
         } as WorldCupMatch;
       }),
     );
+    this.cachedMatches = matches;
+    this.cachedMatchesAt = Date.now();
+    return matches;
+  }
+
+  private async fetchWc2026Matches(
+    url: URL,
+    configuredWcKey: string,
+    fetchTimeoutMs: number,
+  ): Promise<Wc2026MatchesResponse> {
+    const maxAttempts = 3;
+    let lastError: unknown;
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        const abortController = new AbortController();
+        const timeout = setTimeout(() => abortController.abort(), fetchTimeoutMs);
+        const response = await fetch(url, {
+          headers: {
+            Authorization: `Bearer ${configuredWcKey}`,
+            Accept: 'application/json',
+          },
+          signal: abortController.signal,
+        }).finally(() => clearTimeout(timeout));
+
+        const responseBody = await response.text();
+        if (!response.ok) {
+          this.logger.error(
+            `WC2026 API respondeu status ${response.status}: ${responseBody.slice(0, 500)}`,
+          );
+          throw new BadGatewayException('API de jogos respondeu com erro.');
+        }
+
+        return JSON.parse(responseBody) as Wc2026MatchesResponse;
+      } catch (error) {
+        lastError = error;
+        this.logger.warn(
+          `Tentativa ${attempt}/${maxAttempts} falhou ao consultar WC2026 API: ${this.errorMessage(error)}`,
+        );
+        if (attempt < maxAttempts) {
+          await this.delay(350 * attempt);
+        }
+      }
+    }
+
+    if (this.cachedMatches !== null) {
+      this.logger.warn('Usando cache em memoria da ultima resposta valida da WC2026 API.');
+      return this.cachedMatches as Wc2026MatchesResponse;
+    }
+
+    this.logger.error('Falha ao consultar WC2026 API apos novas tentativas.', lastError);
+    throw new BadGatewayException('Nao foi possivel consultar a API de jogos.');
   }
 
   private getMockWorldCup2026Matches(): WorldCupMatch[] {
@@ -133,6 +197,20 @@ export class MatchesService {
       (a, b) =>
         new Date(a.kickoffAt).getTime() - new Date(b.kickoffAt).getTime(),
     );
+  }
+
+  private delay(milliseconds: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, milliseconds));
+  }
+
+  private errorMessage(error: unknown): string {
+    if (error instanceof Error) return error.message;
+    return String(error);
+  }
+
+  private positiveInt(value: string | undefined, fallback: number): number {
+    const parsed = Number(value);
+    return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
   }
 
   private resolveScore(match: Wc2026Match, team: 'home' | 'away'): number | undefined {

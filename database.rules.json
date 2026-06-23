@@ -6,7 +6,31 @@
       "$uid": {
         ".read": "auth != null && auth.uid === $uid",
         ".write": "auth != null && auth.uid === $uid",
-        ".validate": "newData.hasChildren(['nick', 'avatarId']) && newData.child('nick').isString() && newData.child('nick').val().length >= 3 && newData.child('nick').val().length <= 24 && newData.child('avatarId').isString()"
+        ".validate": "newData.hasChildren(['nick', 'avatarId'])",
+        "nick": {
+          ".validate": "newData.isString() && newData.val().length >= 3 && newData.val().length <= 24"
+        },
+        "avatarId": {
+          ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 40"
+        },
+        "photoUrl": {
+          ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 2048 && newData.val().beginsWith('https://'))"
+        },
+        "email": {
+          ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 254)"
+        },
+        "displayName": {
+          ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 80)"
+        },
+        "createdAt": {
+          ".validate": "!newData.exists() || newData.isNumber()"
+        },
+        "updatedAt": {
+          ".validate": "!newData.exists() || newData.isNumber()"
+        },
+        "$other": {
+          ".validate": false
+        }
       }
     },
     "predictions": {

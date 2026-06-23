@@ -5,7 +5,9 @@
 ### `.env` na raiz
 
 - [ ] Definir `API_BASE_URL=https://sua-api-cloud-run`.
+- [ ] Definir `APP_CHECK_WEB_RECAPTCHA_SITE_KEY=sua-chave-recaptcha-v3-do-firebase-app-check`.
 - [ ] Definir `APP_CHECK_ANDROID_PROVIDER=play_integrity`.
+- [ ] Nao colocar `WC2026_API_KEY`, service account, senha, token privado ou chave Admin no `.env` usado pelo Flutter.
 
 ### Cloud Run
 
@@ -16,6 +18,8 @@
 - [ ] Definir `FIREBASE_APP_CHECK_CONSUME_TOKENS=false`.
 - [ ] Definir `WC2026_BASE_URL=https://api.wc2026api.com`.
 - [ ] Definir `WC2026_API_KEY=...`.
+- [ ] Definir `CORS_ORIGINS=https://copa-palpite.web.app,https://copa-palpite.firebaseapp.com`.
+- [ ] Guardar `FIREBASE_SERVICE_ACCOUNT_BASE64`/`FIREBASE_SERVICE_ACCOUNT` somente no ambiente do backend.
 
 ## Firebase
 
@@ -35,6 +39,9 @@ firebase deploy --only storage --project copa-palpite
 - [ ] Confirmar Play Integrity registrado.
 - [ ] Confirmar SHA-256 do keystore release cadastrado no Firebase.
 - [ ] Confirmar Storage ativo e regras publicadas.
+- [ ] Confirmar App Check para Web com reCAPTCHA v3.
+- [ ] Ativar enforcement do App Check para Realtime Database, Storage e APIs Firebase usadas pelo app.
+- [ ] Cadastrar os dominios do Hosting em Firebase Auth > Authorized domains.
 
 ## API
 
@@ -76,6 +83,32 @@ flutter test
 
 ```powershell
 .\scripts\run-android.ps1 -DeviceId emulator-5554
+```
+
+## Build Web
+
+- [ ] Gerar build web release:
+
+```powershell
+.\scripts\build-web-release.ps1
+```
+
+- [ ] Conferir que o build gerado fica em:
+
+```text
+build\web
+```
+
+- [ ] Publicar Firebase Hosting:
+
+```powershell
+firebase deploy --only hosting --project copa-palpite
+```
+
+- [ ] Testar no dominio final:
+
+```text
+https://copa-palpite.web.app
 ```
 
 ## Assinatura Android

@@ -1,0 +1,11 @@
+[
+  {
+    "origin": [
+      "https://copa-palpite.web.app",
+      "https://copa-palpite.firebaseapp.com"
+    ],
+    "method": ["GET", "HEAD"],
+    "responseHeader": ["Content-Type"],
+    "maxAgeSeconds": 3600
+  }
+]
