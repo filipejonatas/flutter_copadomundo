@@ -9,6 +9,7 @@ export class MatchesService {
   private readonly persistentCachePath = 'cache/worldCup2026Matches';
   private cachedMatches: WorldCupMatch[] | null = null;
   private cachedMatchesAt = 0;
+  private refreshPromise: Promise<WorldCupMatch[]> | null = null;
 
   constructor(
     private readonly configService: ConfigService,
@@ -42,14 +43,56 @@ export class MatchesService {
       this.configService.get<string>('WC2026_BASE_URL') ??
       'https://api.wc2026api.com';
     const url = new URL('/matches', baseUrl);
+    const fetchTimeoutMs = this.positiveInt(
+      this.configService.get<string>('WC2026_FETCH_TIMEOUT_MS'),
+      7000,
+    );
 
+    const persistentMatches = await this.loadPersistentMatchesCache();
+    if (persistentMatches.length > 0) {
+      this.cachedMatches = persistentMatches;
+      this.cachedMatchesAt = Date.now();
+      this.refreshMatchesCache(url, configuredWcKey, fetchTimeoutMs).catch(
+        (error: unknown) => {
+          this.logger.warn(
+            `Refresh em background dos jogos falhou: ${this.errorMessage(error)}`,
+          );
+        },
+      );
+      return persistentMatches;
+    }
+
+    return this.refreshMatchesCache(url, configuredWcKey, fetchTimeoutMs);
+  }
+
+  private async refreshMatchesCache(
+    url: URL,
+    configuredWcKey: string,
+    fetchTimeoutMs: number,
+  ): Promise<WorldCupMatch[]> {
+    if (this.refreshPromise !== null) {
+      return this.refreshPromise;
+    }
+
+    this.refreshPromise = this.fetchAndCacheWc2026Matches(
+      url,
+      configuredWcKey,
+      fetchTimeoutMs,
+    ).finally(() => {
+      this.refreshPromise = null;
+    });
+    return this.refreshPromise;
+  }
+
+  private async fetchAndCacheWc2026Matches(
+    url: URL,
+    configuredWcKey: string,
+    fetchTimeoutMs: number,
+  ): Promise<WorldCupMatch[]> {
     const payload = await this.fetchWc2026Matches(
       url,
       configuredWcKey,
-      this.positiveInt(
-        this.configService.get<string>('WC2026_FETCH_TIMEOUT_MS'),
-        7000,
-      ),
+      fetchTimeoutMs,
     );
     if (!Array.isArray(payload)) {
       return this.getMockWorldCup2026Matches();

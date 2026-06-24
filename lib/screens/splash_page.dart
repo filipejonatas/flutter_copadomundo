@@ -7,7 +7,10 @@ import '../theme/app_theme.dart';
 
 /// Static trophy splash page shown before entering the app flow.
 class SplashPage extends StatelessWidget {
-  const SplashPage({super.key});
+  const SplashPage({super.key, this.isBusy = false, this.errorMessage});
+
+  final bool isBusy;
+  final String? errorMessage;
 
   @override
   Widget build(BuildContext context) {
@@ -78,10 +81,21 @@ class SplashPage extends StatelessWidget {
                   .fadeIn(delay: 460.ms, duration: 420.ms)
                   .slideY(begin: .2, end: 0, duration: 420.ms),
               const Spacer(),
+              if (errorMessage != null) ...[
+                Text(
+                  errorMessage!,
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: AppColors.liveBadge,
+                    fontSize: 14,
+                  ),
+                ),
+                const SizedBox(height: 14),
+              ],
               SizedBox(
                 width: double.infinity,
                 child: FilledButton(
-                  onPressed: () => context.go('/login'),
+                  onPressed: isBusy ? null : () => context.go('/login'),
                   style: FilledButton.styleFrom(
                     backgroundColor: AppColors.primaryAccent,
                     foregroundColor: Colors.black,
@@ -94,19 +108,29 @@ class SplashPage extends StatelessWidget {
                     mainAxisAlignment: MainAxisAlignment.center,
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Text(
-                        'Começar',
-                        style: TextStyle(
+                      Text(
+                        isBusy ? 'Carregando...' : 'Começar',
+                        style: const TextStyle(
                           color: Colors.black,
                           fontWeight: FontWeight.w900,
                           fontSize: 16,
                         ),
                       ),
                       const SizedBox(width: 10),
-                      PhosphorIcon(
-                        PhosphorIcons.arrowRight(),
-                        color: Colors.black,
-                      ),
+                      if (isBusy)
+                        const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.black,
+                          ),
+                        )
+                      else
+                        PhosphorIcon(
+                          PhosphorIcons.arrowRight(),
+                          color: Colors.black,
+                        ),
                     ],
                   ),
                 ),

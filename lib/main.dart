@@ -19,14 +19,7 @@ import 'services/session_controller.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await _initializeFirebase();
-  await activateAppCheck();
-
-  runApp(
-    ProviderScope(
-      child: CopaPalpiteApp(sessionController: FirebaseSessionController()),
-    ),
-  );
+  runApp(const ProviderScope(child: FirebaseBootstrapApp()));
 }
 
 Future<void> _initializeFirebase() async {
@@ -38,6 +31,48 @@ Future<void> _initializeFirebase() async {
     );
   } on FirebaseException catch (error) {
     if (error.code != 'duplicate-app') rethrow;
+  }
+}
+
+class FirebaseBootstrapApp extends StatefulWidget {
+  const FirebaseBootstrapApp({super.key});
+
+  @override
+  State<FirebaseBootstrapApp> createState() => _FirebaseBootstrapAppState();
+}
+
+class _FirebaseBootstrapAppState extends State<FirebaseBootstrapApp> {
+  late final Future<FirebaseSessionController> _bootstrapFuture = _bootstrap();
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<FirebaseSessionController>(
+      future: _bootstrapFuture,
+      builder: (context, snapshot) {
+        final controller = snapshot.data;
+        if (controller != null) {
+          return CopaPalpiteApp(sessionController: controller);
+        }
+
+        return MaterialApp(
+          debugShowCheckedModeBanner: false,
+          title: 'Copa Palpite',
+          theme: AppTheme.dark(),
+          home: SplashPage(
+            isBusy: true,
+            errorMessage: snapshot.hasError
+                ? 'Nao foi possivel iniciar o app. Tente recarregar.'
+                : null,
+          ),
+        );
+      },
+    );
+  }
+
+  Future<FirebaseSessionController> _bootstrap() async {
+    await _initializeFirebase();
+    await activateAppCheck();
+    return FirebaseSessionController();
   }
 }
 

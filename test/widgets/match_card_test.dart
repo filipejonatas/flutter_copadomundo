@@ -10,13 +10,125 @@ void main() {
     test('maps current API team names to their own flags', () {
       expect(countryCodeForTeam('England'), 'GB-ENG');
       expect(countryCodeForTeam('Scotland'), 'GB-SCT');
-      expect(countryCodeForTeam('Curaçao'), 'CW');
-      expect(countryCodeForTeam("Côte d'Ivoire"), 'CI');
+      expect(countryCodeForTeam('Cura\u00e7ao'), 'CW');
+      expect(countryCodeForTeam("C\u00f4te d'Ivoire"), 'CI');
       expect(countryCodeForTeam('Bosnia-Herzegovina'), 'BA');
       expect(countryCodeForTeam('Congo DR'), 'CD');
       expect(countryCodeForTeam('IR Iran'), 'IR');
       expect(countryCodeForTeam('Cabo Verde'), 'CV');
     });
+
+    test(
+      'maps every team returned by the published API to an existing asset',
+      () {
+        const teamsFromPublishedApi = <String, String>{
+          'Algeria': 'DZ',
+          'Argentina': 'AR',
+          'Australia': 'AU',
+          'Austria': 'AT',
+          'Belgium': 'BE',
+          'Bosnia-Herzegovina': 'BA',
+          'Brazil': 'BR',
+          'Cabo Verde': 'CV',
+          'Canada': 'CA',
+          'Colombia': 'CO',
+          'Congo DR': 'CD',
+          "C\u00f4te d'Ivoire": 'CI',
+          'Croatia': 'HR',
+          'Cura\u00e7ao': 'CW',
+          'Czechia': 'CZ',
+          'Ecuador': 'EC',
+          'Egypt': 'EG',
+          'England': 'GB-ENG',
+          'France': 'FR',
+          'Germany': 'DE',
+          'Ghana': 'GH',
+          'Haiti': 'HT',
+          'IR Iran': 'IR',
+          'Iraq': 'IQ',
+          'Japan': 'JP',
+          'Jordan': 'JO',
+          'Korea Republic': 'KR',
+          'Mexico': 'MX',
+          'Morocco': 'MA',
+          'Netherlands': 'NL',
+          'New Zealand': 'NZ',
+          'Norway': 'NO',
+          'Panama': 'PA',
+          'Paraguay': 'PY',
+          'Portugal': 'PT',
+          'Qatar': 'QA',
+          'Saudi Arabia': 'SA',
+          'Scotland': 'GB-SCT',
+          'Senegal': 'SN',
+          'South Africa': 'ZA',
+          'Spain': 'ES',
+          'Sweden': 'SE',
+          'Switzerland': 'CH',
+          'Tunisia': 'TN',
+          'Turkey': 'TR',
+          'Uruguay': 'UY',
+          'USA': 'US',
+          'Uzbekistan': 'UZ',
+        };
+        const availableFlagCodes = <String>{
+          'AR',
+          'AT',
+          'AU',
+          'BA',
+          'BE',
+          'BR',
+          'CA',
+          'CD',
+          'CH',
+          'CI',
+          'CO',
+          'CV',
+          'CW',
+          'CZ',
+          'DE',
+          'DZ',
+          'EC',
+          'EG',
+          'ES',
+          'FR',
+          'GB-ENG',
+          'GB-SCT',
+          'GH',
+          'HR',
+          'HT',
+          'IQ',
+          'IR',
+          'JO',
+          'JP',
+          'KR',
+          'MA',
+          'MX',
+          'NL',
+          'NO',
+          'NZ',
+          'PA',
+          'PT',
+          'PY',
+          'QA',
+          'SA',
+          'SE',
+          'SN',
+          'TN',
+          'TR',
+          'US',
+          'UY',
+          'UZ',
+          'ZA',
+        };
+
+        for (final entry in teamsFromPublishedApi.entries) {
+          final code = countryCodeForTeam(entry.key);
+          expect(code, entry.value, reason: entry.key);
+          expect(availableFlagCodes, contains(code), reason: entry.key);
+        }
+      },
+    );
 
     test('does not fall back to USA for unknown teams', () {
       expect(countryCodeForTeam('Winner Group A'), isNull);

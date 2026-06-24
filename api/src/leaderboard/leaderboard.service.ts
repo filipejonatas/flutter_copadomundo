@@ -169,7 +169,7 @@ export class LeaderboardService {
       userId,
       nick,
       avatarId,
-      photoUrl,
+      ...(photoUrl === undefined ? {} : { photoUrl }),
       points: score.points,
       predictionsCount: score.predictionsCount,
       hits: score.hits,
