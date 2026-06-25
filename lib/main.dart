@@ -10,6 +10,7 @@ import 'screens/login_screen.dart';
 import 'screens/main_shell.dart';
 import 'screens/home_screen.dart';
 import 'screens/leaderboard_screen.dart';
+import 'screens/playoff_screen.dart';
 import 'screens/predictions_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/splash_page.dart';
@@ -136,6 +137,15 @@ class CopaPalpiteApp extends StatelessWidget {
                   path: '/ranking',
                   builder: (context, state) =>
                       LeaderboardScreen(sessionController: sessionController),
+                ),
+              ],
+            ),
+            StatefulShellBranch(
+              routes: [
+                GoRoute(
+                  path: '/playoff',
+                  builder: (context, state) =>
+                      PlayoffScreen(sessionController: sessionController),
                 ),
               ],
             ),
