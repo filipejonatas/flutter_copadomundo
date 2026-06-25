@@ -11,6 +11,7 @@ export type MatchPick = 'home' | 'draw' | 'away';
 export interface UserMatchPrediction {
   fixtureId: number;
   pick: MatchPick;
+  qualifiedPick?: Exclude<MatchPick, 'draw'>;
   homeScore: number;
   awayScore: number;
   round?: string;
@@ -22,6 +23,7 @@ export interface UserMatchPrediction {
 export interface SavePredictionBody {
   fixtureId?: unknown;
   pick?: unknown;
+  qualifiedPick?: unknown;
   homeScore?: unknown;
   awayScore?: unknown;
 }
@@ -53,6 +55,7 @@ export class PredictionsService {
   ): Promise<UserMatchPrediction> {
     const fixtureId = this.validFixtureId(body.fixtureId);
     const pick = this.validPick(body.pick);
+    const qualifiedPick = this.validQualifiedPick(body.qualifiedPick);
     const homeScore = this.validScore(body.homeScore, 'homeScore');
     const awayScore = this.validScore(body.awayScore, 'awayScore');
     const matches = await this.matchesService.getWorldCup2026Matches();
@@ -67,10 +70,14 @@ export class PredictionsService {
     if (pick !== this.pickFromScore(homeScore, awayScore)) {
       throw new BadRequestException('Palpite nao confere com o placar informado.');
     }
+    if (qualifiedPick && pick !== 'draw' && qualifiedPick !== pick) {
+      throw new BadRequestException('Classificado nao confere com o placar informado.');
+    }
 
     const prediction = {
       fixtureId,
       pick,
+      ...(qualifiedPick === undefined ? {} : { qualifiedPick }),
       homeScore,
       awayScore,
       round: match.round,
@@ -86,6 +93,7 @@ export class PredictionsService {
     return {
       fixtureId,
       pick,
+      ...(qualifiedPick === undefined ? {} : { qualifiedPick }),
       homeScore,
       awayScore,
       round: match.round,
@@ -116,6 +124,12 @@ export class PredictionsService {
   private validPick(value: unknown): MatchPick {
     if (value === 'home' || value === 'draw' || value === 'away') return value;
     throw new BadRequestException('pick invalido.');
+  }
+
+  private validQualifiedPick(value: unknown): Exclude<MatchPick, 'draw'> | undefined {
+    if (value === undefined || value === null || value === '') return undefined;
+    if (value === 'home' || value === 'away') return value;
+    throw new BadRequestException('qualifiedPick invalido.');
   }
 
   private validScore(value: unknown, field: string): number {

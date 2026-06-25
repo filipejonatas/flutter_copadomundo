@@ -10,5 +10,6 @@ import { LeaderboardService } from './leaderboard.service';
   imports: [MatchesModule, PredictionsModule],
   controllers: [LeaderboardController],
   providers: [AuthService, FirebaseAdminService, LeaderboardService],
+  exports: [LeaderboardService],
 })
 export class LeaderboardModule {}

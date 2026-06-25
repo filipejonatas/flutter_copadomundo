@@ -168,6 +168,7 @@ export class MatchesService {
         if (this.isWorldCupMatch(m)) return m;
 
         const kickoff = m.kickoff_utc ?? m.kickoff ?? new Date().toISOString();
+        const qualifiedPick = this.resolveQualifiedPick(m);
         return {
           fixtureId: m.id ?? m.match_number ?? 0,
           round: (m.round ?? '') + (m.group_name ? ` - ${m.group_name}` : ''),
@@ -178,6 +179,7 @@ export class MatchesService {
           status: m.phase ?? m.status ?? '',
           homeScore: this.resolveScore(m, 'home'),
           awayScore: this.resolveScore(m, 'away'),
+          ...(qualifiedPick === undefined ? {} : { qualifiedPick }),
         };
       }),
     );
@@ -197,6 +199,9 @@ export class MatchesService {
           status: match.status,
           ...(match.homeScore === undefined ? {} : { homeScore: match.homeScore }),
           ...(match.awayScore === undefined ? {} : { awayScore: match.awayScore }),
+          ...(match.qualifiedPick === undefined
+            ? {}
+            : { qualifiedPick: match.qualifiedPick }),
         })),
       });
     } catch (error) {
@@ -343,6 +348,18 @@ export class MatchesService {
     const nestedScore = team === 'home' ? match.score?.home : match.score?.away;
     return directScore ?? camelScore ?? nestedScore;
   }
+
+  private resolveQualifiedPick(match: Wc2026Match): 'home' | 'away' | undefined {
+    if (match.qualifiedPick === 'home' || match.qualifiedPick === 'away') {
+      return match.qualifiedPick;
+    }
+
+    const winner = (match.winner ?? match.winner_team ?? '').trim();
+    if (winner.length === 0) return undefined;
+    if (winner === match.home_team) return 'home';
+    if (winner === match.away_team) return 'away';
+    return undefined;
+  }
 }
 
 // Types for WC2026 API responses
@@ -362,6 +379,9 @@ interface Wc2026Match {
   away_score?: number;
   homeScore?: number;
   awayScore?: number;
+  qualifiedPick?: 'home' | 'away';
+  winner?: string;
+  winner_team?: string;
   score?: {
     home?: number;
     away?: number;
