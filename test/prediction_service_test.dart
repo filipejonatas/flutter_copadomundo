@@ -65,6 +65,40 @@ void main() {
       });
     });
 
+    test('should save predictions in bulk to backend', () async {
+      // Arrange
+      late http.Request capturedRequest;
+      final service = PredictionService(
+        firebaseAuth: auth,
+        firebaseAppCheck: appCheck,
+        httpClient: MockClient((request) async {
+          capturedRequest = request;
+          return http.Response('{}', 201);
+        }),
+        apiBaseUrl: 'https://api.example.test',
+      );
+
+      // Act
+      await service.savePredictionsBulk(
+        user: testUser,
+        predictions: {futureMatch: savedPrediction},
+      );
+
+      // Assert
+      expect(capturedRequest.method, 'POST');
+      expect(capturedRequest.url.path, '/predictions/bulk');
+      expect(jsonDecode(capturedRequest.body), {
+        'predictions': [
+          {
+            'fixtureId': 101,
+            'pick': 'home',
+            'homeScore': 2,
+            'awayScore': 1,
+          },
+        ],
+      });
+    });
+
     test('should load matches from backend', () async {
       // Arrange
       final service = PredictionService(
@@ -251,10 +285,61 @@ void main() {
       expect(predictions[101]?.homeScore, 2);
       expect(predictions[101]?.awayScore, 1);
     });
+
+    test('should load public prediction results for finished match', () async {
+      // Arrange
+      late http.Request capturedRequest;
+      final service = PredictionService(
+        firebaseAuth: auth,
+        firebaseAppCheck: appCheck,
+        httpClient: MockClient((request) async {
+          capturedRequest = request;
+          return http.Response(
+            jsonEncode({
+              'fixtureId': 102,
+              'round': 'Group Stage - 1',
+              'homeTeam': 'Mexico',
+              'awayTeam': 'South Africa',
+              'status': 'FT',
+              'homeScore': 2,
+              'awayScore': 1,
+              'predictions': [
+                {
+                  'userId': 'user-1',
+                  'nick': 'User Test',
+                  'avatarId': 'star',
+                  'pick': 'home',
+                  'predictedHomeScore': 2,
+                  'predictedAwayScore': 1,
+                  'points': 5,
+                  'exactScore': true,
+                  'correctPick': true,
+                },
+              ],
+            }),
+            200,
+          );
+        }),
+        apiBaseUrl: 'https://api.example.test',
+      );
+
+      // Act
+      final result = await service.loadMatchPredictionResults(
+        user: testUser,
+        fixtureId: 102,
+      );
+
+      // Assert
+      expect(capturedRequest.method, 'GET');
+      expect(capturedRequest.url.path, '/predictions/results/102');
+      expect(result.predictions, hasLength(1));
+      expect(result.predictions.single.points, 5);
+      expect(result.predictions.single.exactScore, isTrue);
+    });
   });
 
   group('Prediction points', () {
-    test('should calculate exact score as 3 points', () {
+    test('should calculate exact score as 5 points', () {
       // Arrange
       const prediction = UserMatchPrediction(
         pick: MatchPick.home,
@@ -270,10 +355,10 @@ void main() {
       );
 
       // Assert
-      expect(points, 3);
+      expect(points, 5);
     });
 
-    test('should calculate correct winner only as 1 point', () {
+    test('should calculate correct winner only as 3 points', () {
       // Arrange
       const prediction = UserMatchPrediction(
         pick: MatchPick.home,
@@ -289,7 +374,7 @@ void main() {
       );
 
       // Assert
-      expect(points, 1);
+      expect(points, 3);
     });
 
     test('should calculate wrong prediction as 0 points', () {

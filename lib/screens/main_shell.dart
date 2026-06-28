@@ -68,9 +68,11 @@ class MainShell extends StatelessWidget {
                     onTap: () => _goBranch(3),
                   ),
                   _BottomNavItem(
-                    tooltip: 'Profile',
-                    icon: PhosphorIcons.user(),
-                    activeIcon: PhosphorIcons.user(PhosphorIconsStyle.fill),
+                    tooltip: 'Resultados',
+                    icon: PhosphorIcons.chartBar(),
+                    activeIcon: PhosphorIcons.chartBar(
+                      PhosphorIconsStyle.fill,
+                    ),
                     isActive: navigationShell.currentIndex == 4,
                     onTap: () => _goBranch(4),
                   ),

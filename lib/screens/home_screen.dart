@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:go_router/go_router.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../models/match_prediction.dart';
@@ -72,6 +73,16 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                   LogoutCircleButton(
                     sessionController: widget.sessionController,
+                  ),
+                  const SizedBox(width: 8),
+                  IconButton(
+                    tooltip: 'Perfil',
+                    onPressed: () => context.push('/profile'),
+                    style: IconButton.styleFrom(
+                      backgroundColor: AppColors.surface,
+                      foregroundColor: AppColors.primaryAccent,
+                    ),
+                    icon: PhosphorIcon(PhosphorIcons.user()),
                   ),
                 ],
               ),

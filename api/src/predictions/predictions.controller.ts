@@ -1,7 +1,11 @@
-import { Body, Controller, Get, Headers, Ip, Post } from '@nestjs/common';
+import { Body, Controller, Get, Headers, Ip, Param, Post } from '@nestjs/common';
 import { AuthService } from '../auth/auth.service';
 import { PredictionRateLimitService } from './prediction-rate-limit.service';
-import { PredictionsService, SavePredictionBody } from './predictions.service';
+import {
+  PredictionsService,
+  SavePredictionBody,
+  SavePredictionsBulkBody,
+} from './predictions.service';
 
 @Controller('predictions')
 export class PredictionsController {
@@ -34,5 +38,38 @@ export class PredictionsController {
     const fixtureId = this.predictionsService.validFixtureId(body.fixtureId);
     this.predictionRateLimit.checkUser(user.uid, ip, fixtureId);
     return this.predictionsService.savePrediction(user, body);
+  }
+
+  @Post('bulk')
+  async savePredictionsBulk(
+    @Headers('authorization') authorization: string | undefined,
+    @Headers('x-firebase-appcheck') appCheckToken: string | undefined,
+    @Body() body: SavePredictionsBulkBody,
+    @Ip() ip: string,
+  ) {
+    this.predictionRateLimit.checkIp(ip);
+    await this.authService.verifyAppCheckHeader(appCheckToken);
+    const user = await this.authService.verifyAuthorizationHeader(authorization);
+    if (Array.isArray(body.predictions)) {
+      for (const item of body.predictions) {
+        const fixtureId = this.predictionsService.validFixtureId(
+          (item as SavePredictionBody).fixtureId,
+        );
+        this.predictionRateLimit.checkUser(user.uid, ip, fixtureId);
+      }
+    }
+    return this.predictionsService.savePredictionsBulk(user, body);
+  }
+
+  @Get('results/:fixtureId')
+  async getMatchPredictionResults(
+    @Headers('authorization') authorization: string | undefined,
+    @Headers('x-firebase-appcheck') appCheckToken: string | undefined,
+    @Param('fixtureId') fixtureIdParam: string,
+  ) {
+    await this.authService.verifyAppCheckHeader(appCheckToken);
+    await this.authService.verifyAuthorizationHeader(authorization);
+    const fixtureId = this.predictionsService.validFixtureId(Number(fixtureIdParam));
+    return this.predictionsService.getMatchPredictionResults(fixtureId);
   }
 }

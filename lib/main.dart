@@ -13,6 +13,7 @@ import 'screens/leaderboard_screen.dart';
 import 'screens/playoff_screen.dart';
 import 'screens/predictions_screen.dart';
 import 'screens/profile_screen.dart';
+import 'screens/results_screen.dart';
 import 'screens/splash_page.dart';
 import 'theme/app_theme.dart';
 import 'services/app_check_config.dart';
@@ -107,6 +108,11 @@ class CopaPalpiteApp extends StatelessWidget {
           builder: (context, state) =>
               LoginPage(sessionController: sessionController),
         ),
+        GoRoute(
+          path: '/profile',
+          builder: (context, state) =>
+              ProfileScreen(sessionController: sessionController),
+        ),
         StatefulShellRoute.indexedStack(
           builder: (context, state, navigationShell) => MainShell(
             sessionController: sessionController,
@@ -152,9 +158,10 @@ class CopaPalpiteApp extends StatelessWidget {
             StatefulShellBranch(
               routes: [
                 GoRoute(
-                  path: '/profile',
-                  builder: (context, state) =>
-                      ProfileScreen(sessionController: sessionController),
+                  path: '/results',
+                  builder: (context, state) => ResultsScreen(
+                    sessionController: sessionController,
+                  ),
                 ),
               ],
             ),

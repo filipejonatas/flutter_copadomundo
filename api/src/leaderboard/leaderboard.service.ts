@@ -3,11 +3,7 @@ import { ServerValue } from 'firebase-admin/database';
 import { FirebaseAdminService } from '../firebase-admin.service';
 import { MatchesService } from '../matches/matches.service';
 import { WorldCupMatch } from '../matches/world-cup-match';
-import {
-  MatchPick,
-  PredictionsService,
-  UserMatchPrediction,
-} from '../predictions/predictions.service';
+import { PredictionsService, UserMatchPrediction } from '../predictions/predictions.service';
 
 export interface LeaderboardEntry {
   position: number;
@@ -35,9 +31,6 @@ export class LeaderboardService {
     private readonly matchesService: MatchesService,
     private readonly predictionsService: PredictionsService,
   ) {}
-
-  static readonly pointsPerExactScore = 5;
-  static readonly pointsPerCorrectPick = 3;
 
   async loadLeaderboard(): Promise<LeaderboardEntry[]> {
     const matches = await this.matchesService.getWorldCup2026Matches();
@@ -107,25 +100,18 @@ export class LeaderboardService {
         continue;
       }
 
-      const actualPick = this.predictionsService.pickFromScore(
-        match.homeScore,
-        match.awayScore,
+      const score = this.predictionsService.calculatePredictionScore(
+        prediction,
+        match,
       );
-      const correctPick = prediction.pick === actualPick;
-      const exactScore =
-        correctPick &&
-        prediction.homeScore === match.homeScore &&
-        prediction.awayScore === match.awayScore;
-      const matchPoints = exactScore
-        ? LeaderboardService.pointsPerExactScore
-        : correctPick
-          ? LeaderboardService.pointsPerCorrectPick
-          : 0;
+      const actualPick =
+        match.qualifiedPick ??
+        this.predictionsService.pickFromScore(match.homeScore, match.awayScore);
 
       predictionsCount++;
-      points += matchPoints;
-      if (correctPick) hits++;
-      if (exactScore) exactScores++;
+      points += score.points;
+      if (score.correctPick) hits++;
+      if (score.exactScore) exactScores++;
 
       matchScores[fixtureId] = {
         fixtureId: match.fixtureId,
@@ -135,8 +121,8 @@ export class LeaderboardService {
         awayScore: match.awayScore,
         predictedHomeScore: prediction.homeScore,
         predictedAwayScore: prediction.awayScore,
-        points: matchPoints,
-        exactScore,
+        points: score.points,
+        exactScore: score.exactScore,
       };
     }
 

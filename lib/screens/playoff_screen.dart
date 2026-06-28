@@ -4,7 +4,9 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../models/app_user.dart';
 import '../models/leaderboard_entry.dart';
+import '../models/playoff.dart';
 import '../services/leaderboard_service.dart';
+import '../services/playoff_service.dart';
 import '../services/session_controller.dart';
 import '../theme/app_theme.dart';
 import '../widgets/logout_circle_button.dart';
@@ -15,10 +17,12 @@ class PlayoffScreen extends StatefulWidget {
     super.key,
     required this.sessionController,
     this.leaderboardService,
+    this.playoffService,
   });
 
   final SessionController sessionController;
   final LeaderboardService? leaderboardService;
+  final PlayoffService? playoffService;
 
   @override
   State<PlayoffScreen> createState() => _PlayoffScreenState();
@@ -27,8 +31,11 @@ class PlayoffScreen extends StatefulWidget {
 class _PlayoffScreenState extends State<PlayoffScreen> {
   late final LeaderboardService _leaderboardService =
       widget.leaderboardService ?? LeaderboardService();
+  late final PlayoffService _playoffService =
+      widget.playoffService ?? PlayoffService();
 
   List<LeaderboardEntry> _entries = [];
+  PlayoffBracket? _bracket;
   bool _isLoading = true;
 
   @override
@@ -79,7 +86,9 @@ class _PlayoffScreenState extends State<PlayoffScreen> {
                   child: Text(
                     _isLoading
                         ? 'Montando preview...'
-                        : '${participants.length} players no chaveamento',
+                        : _bracket == null
+                        ? '${participants.length} players no chaveamento'
+                        : '${participants.length} players na chave oficial',
                     style: theme.textTheme.titleMedium,
                   ),
                 ),
@@ -119,6 +128,27 @@ class _PlayoffScreenState extends State<PlayoffScreen> {
     if (user == null) return;
 
     try {
+      try {
+        final bracket = await _playoffService.loadCurrentBracket();
+        if (!mounted) return;
+        if (bracket != null) {
+          setState(() {
+            _bracket = bracket;
+            _entries = bracket.participants
+                .map(
+                  (participant) => participant.toLeaderboardEntry(
+                    isCurrentUser: participant.userId == user.id,
+                  ),
+                )
+                .toList();
+            _isLoading = false;
+          });
+          return;
+        }
+      } catch (_) {
+        debugPrint('Chave oficial indisponivel. Usando preview.');
+      }
+
       final entries = await _leaderboardService.loadLeaderboard(user);
       if (!mounted) return;
       setState(() {

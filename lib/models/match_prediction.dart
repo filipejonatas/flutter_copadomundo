@@ -3,11 +3,13 @@ enum MatchPick { home, draw, away }
 class UserMatchPrediction {
   const UserMatchPrediction({
     required this.pick,
+    this.qualifiedPick,
     this.homeScore,
     this.awayScore,
   });
 
   final MatchPick pick;
+  final MatchPick? qualifiedPick;
   final int? homeScore;
   final int? awayScore;
 
@@ -25,6 +27,7 @@ class MatchPrediction {
     required this.status,
     this.homeScore,
     this.awayScore,
+    this.qualifiedPick,
   });
 
   final int fixtureId;
@@ -36,8 +39,35 @@ class MatchPrediction {
   final String status;
   final int? homeScore;
   final int? awayScore;
+  final MatchPick? qualifiedPick;
 
   bool get hasResult => homeScore != null && awayScore != null;
+
+  bool get isFinished {
+    if (!hasResult) return false;
+    return switch (status.trim().toUpperCase()) {
+      'FT' || 'FINAL' || 'FINISHED' || 'AET' || 'PEN' => true,
+      _ => false,
+    };
+  }
+
+  bool get isPlayoffMatch {
+    final normalizedRound = round.trim().toUpperCase();
+    if (normalizedRound.contains('R32') ||
+        normalizedRound.contains('ROUND OF 32') ||
+        normalizedRound.contains('1/16') ||
+        normalizedRound.contains('16 AVOS') ||
+        normalizedRound.contains('KNOCKOUT') ||
+        normalizedRound.contains('MATA-MATA')) {
+      return true;
+    }
+
+    final kickoff = DateTime.tryParse(kickoffAt);
+    if (kickoff == null) return false;
+    return !kickoff.toUtc().isBefore(
+      DateTime.utc(2026, 6, 29, 3),
+    );
+  }
 
   bool get hasValidKickoff => DateTime.tryParse(kickoffAt) != null;
 
@@ -61,6 +91,97 @@ class MatchPrediction {
       status: json['status'] as String,
       homeScore: intFromStorageValue(json['homeScore']),
       awayScore: intFromStorageValue(json['awayScore']),
+      qualifiedPick: pickFromStorageValue(json['qualifiedPick']),
+    );
+  }
+}
+
+class MatchPredictionResults {
+  const MatchPredictionResults({
+    required this.fixtureId,
+    required this.round,
+    required this.homeTeam,
+    required this.awayTeam,
+    required this.status,
+    required this.homeScore,
+    required this.awayScore,
+    required this.predictions,
+    this.qualifiedPick,
+  });
+
+  final int fixtureId;
+  final String round;
+  final String homeTeam;
+  final String awayTeam;
+  final String status;
+  final int homeScore;
+  final int awayScore;
+  final MatchPick? qualifiedPick;
+  final List<PublicPredictionResult> predictions;
+
+  factory MatchPredictionResults.fromJson(Map<String, dynamic> json) {
+    return MatchPredictionResults(
+      fixtureId: json['fixtureId'] as int,
+      round: json['round'] as String,
+      homeTeam: json['homeTeam'] as String,
+      awayTeam: json['awayTeam'] as String,
+      status: json['status'] as String,
+      homeScore: intFromStorageValue(json['homeScore']) ?? 0,
+      awayScore: intFromStorageValue(json['awayScore']) ?? 0,
+      qualifiedPick: pickFromStorageValue(json['qualifiedPick']),
+      predictions: (json['predictions'] as List<dynamic>? ?? [])
+          .map(
+            (item) => PublicPredictionResult.fromJson(
+              item as Map<String, dynamic>,
+            ),
+          )
+          .toList(),
+    );
+  }
+}
+
+class PublicPredictionResult {
+  const PublicPredictionResult({
+    required this.userId,
+    required this.nick,
+    required this.avatarId,
+    required this.pick,
+    required this.predictedHomeScore,
+    required this.predictedAwayScore,
+    required this.points,
+    required this.exactScore,
+    required this.correctPick,
+    this.photoUrl,
+    this.qualifiedPick,
+  });
+
+  final String userId;
+  final String nick;
+  final String avatarId;
+  final String? photoUrl;
+  final MatchPick pick;
+  final MatchPick? qualifiedPick;
+  final int predictedHomeScore;
+  final int predictedAwayScore;
+  final int points;
+  final bool exactScore;
+  final bool correctPick;
+
+  factory PublicPredictionResult.fromJson(Map<String, dynamic> json) {
+    return PublicPredictionResult(
+      userId: json['userId'] as String,
+      nick: json['nick'] as String,
+      avatarId: json['avatarId'] as String,
+      photoUrl: json['photoUrl'] as String?,
+      pick: pickFromStorageValue(json['pick']) ?? MatchPick.draw,
+      qualifiedPick: pickFromStorageValue(json['qualifiedPick']),
+      predictedHomeScore:
+          intFromStorageValue(json['predictedHomeScore']) ?? 0,
+      predictedAwayScore:
+          intFromStorageValue(json['predictedAwayScore']) ?? 0,
+      points: intFromStorageValue(json['points']) ?? 0,
+      exactScore: json['exactScore'] == true,
+      correctPick: json['correctPick'] == true,
     );
   }
 }
@@ -104,6 +225,7 @@ UserMatchPrediction? userMatchPredictionFromMap(Map<String, dynamic> value) {
 
   return UserMatchPrediction(
     pick: pick,
+    qualifiedPick: pickFromStorageValue(value['qualifiedPick']),
     homeScore: intFromStorageValue(value['homeScore']),
     awayScore: intFromStorageValue(value['awayScore']),
   );
@@ -128,11 +250,11 @@ int calculatePredictionPoints({
 }) {
   if (prediction.homeScore == actualHomeScore &&
       prediction.awayScore == actualAwayScore) {
-    return 3;
+    return 5;
   }
 
   final actualPick = pickFromScore(actualHomeScore, actualAwayScore);
-  return prediction.pick == actualPick ? 1 : 0;
+  return prediction.pick == actualPick ? 3 : 0;
 }
 
 final mockMatches = <MatchPrediction>[

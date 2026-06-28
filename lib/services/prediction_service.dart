@@ -113,6 +113,8 @@ class PredictionService {
       body: jsonEncode({
         'fixtureId': match.fixtureId,
         'pick': pickToStorageValue(prediction.pick),
+        if (_qualifiedPickValue(prediction) != null)
+          'qualifiedPick': _qualifiedPickValue(prediction),
         'homeScore': prediction.homeScore,
         'awayScore': prediction.awayScore,
       }),
@@ -121,6 +123,63 @@ class PredictionService {
     if (response.statusCode < 200 || response.statusCode >= 300) {
       throw Exception(_backendError(response));
     }
+  }
+
+  Future<void> savePredictionsBulk({
+    required AppUser user,
+    required Map<MatchPrediction, UserMatchPrediction> predictions,
+  }) async {
+    final payload = <Map<String, Object?>>[];
+    for (final entry in predictions.entries) {
+      final match = entry.key;
+      final prediction = entry.value;
+      if (!match.isPredictionOpen()) continue;
+      if (!isValidPredictionScore(prediction.homeScore) ||
+          !isValidPredictionScore(prediction.awayScore)) {
+        throw ArgumentError('Informe placares entre 0 e 9.');
+      }
+      payload.add({
+        'fixtureId': match.fixtureId,
+        'pick': pickToStorageValue(prediction.pick),
+        if (_qualifiedPickValue(prediction) != null)
+          'qualifiedPick': _qualifiedPickValue(prediction),
+        'homeScore': prediction.homeScore,
+        'awayScore': prediction.awayScore,
+      });
+    }
+    if (payload.isEmpty) return;
+
+    final response = await _httpClient.post(
+      _apiBaseUri.resolve('/predictions/bulk'),
+      headers: {...await _secureHeaders(), 'Content-Type': 'application/json'},
+      body: jsonEncode({'predictions': payload}),
+    );
+
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw Exception(_backendError(response));
+    }
+  }
+
+  Future<MatchPredictionResults> loadMatchPredictionResults({
+    required AppUser user,
+    required int fixtureId,
+  }) async {
+    if (user.id.startsWith('mock-')) {
+      throw StateError('Resultados mockados nao estao disponiveis.');
+    }
+
+    final response = await _httpClient.get(
+      _apiBaseUri.resolve('/predictions/results/$fixtureId'),
+      headers: await _secureHeaders(),
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception(_backendError(response));
+    }
+
+    return MatchPredictionResults.fromJson(
+      jsonDecode(response.body) as Map<String, dynamic>,
+    );
   }
 
   Future<Map<String, String>> _authHeaders() async {
@@ -152,6 +211,14 @@ class PredictionService {
     }
 
     return {...authHeaders, 'X-Firebase-AppCheck': appCheckToken};
+  }
+
+  String? _qualifiedPickValue(UserMatchPrediction prediction) {
+    final qualifiedPick = prediction.qualifiedPick;
+    if (qualifiedPick == MatchPick.home || qualifiedPick == MatchPick.away) {
+      return pickToStorageValue(qualifiedPick!);
+    }
+    return null;
   }
 }
 
