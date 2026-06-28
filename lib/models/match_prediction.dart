@@ -65,7 +65,7 @@ class MatchPrediction {
     final kickoff = DateTime.tryParse(kickoffAt);
     if (kickoff == null) return false;
     return !kickoff.toUtc().isBefore(
-      DateTime.utc(2026, 6, 29, 3),
+      DateTime.utc(2026, 6, 28, 3),
     );
   }
 

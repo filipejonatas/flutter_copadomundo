@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:go_router/go_router.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../models/app_user.dart';
@@ -69,10 +70,19 @@ class _PlayoffScreenState extends State<PlayoffScreen> {
           children: [
             Text(
               'Mata-Mata da Copa do Mundo : Onde o filho chora e a mãe não vê',
+              textAlign: TextAlign.center,
               style: theme.textTheme.headlineMedium?.copyWith(height: 1.04),
             ),
             const SizedBox(height: 12),
             const _RulesPanel(),
+            const SizedBox(height: 18),
+            FilledButton.icon(
+              onPressed: _isLoading
+                  ? null
+                  : () => context.push('/playoff/confrontos'),
+              icon: PhosphorIcon(PhosphorIcons.target()),
+              label: const Text('Visualizar Confrontos'),
+            ),
             const SizedBox(height: 18),
             Row(
               children: [
@@ -215,7 +225,7 @@ class _RulesPanel extends StatelessWidget {
           ),
           const _RuleLine(
             text:
-                'A disputa começa a contar em 29/06, na fase 1/16 da Copa.',
+                'A disputa começa a contar em 28/06, na fase 1/16 da Copa.',
           ),
         ],
       ),
@@ -254,7 +264,7 @@ class _RuleLine extends StatelessWidget {
   }
 }
 
-class _PreviewBracket extends StatelessWidget {
+class _PreviewBracket extends StatefulWidget {
   const _PreviewBracket({required this.participants});
 
   static const int maxParticipants = 32;
@@ -296,11 +306,25 @@ class _PreviewBracket extends StatelessWidget {
   final List<_BracketParticipant> participants;
 
   @override
+  State<_PreviewBracket> createState() => _PreviewBracketState();
+}
+
+class _PreviewBracketState extends State<_PreviewBracket> {
+  final ScrollController _scrollController = ScrollController();
+  bool _didCenterBracket = false;
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final participantBySeed = {
-      for (final participant in participants) participant.seed: participant,
+      for (final participant in widget.participants) participant.seed: participant,
     };
-    final firstRound = seedOrder
+    final firstRound = _PreviewBracket.seedOrder
         .map(
           (seed) =>
               participantBySeed[seed] ??
@@ -308,40 +332,67 @@ class _PreviewBracket extends StatelessWidget {
         )
         .toList();
 
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(AppRadii.card),
-      child: Container(
-        color: AppColors.surface,
-        child: SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.all(14),
-          child: SizedBox(
-            width: 1120,
-            height: 690,
-            child: Stack(
-              children: [
-                Positioned.fill(
-                  child: CustomPaint(
-                    painter: _BracketLinesPainter(),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final viewportContentWidth = constraints.maxWidth - 28;
+        final bracketViewportWidth =
+            viewportContentWidth > 1120 ? viewportContentWidth : 1120.0;
+
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!_didCenterBracket && _scrollController.hasClients) {
+            final maxExtent = _scrollController.position.maxScrollExtent;
+            if (maxExtent > 0) {
+              _scrollController.jumpTo(maxExtent / 2);
+            }
+            _didCenterBracket = true;
+          }
+        });
+
+        return ClipRRect(
+          borderRadius: BorderRadius.circular(AppRadii.card),
+          child: Container(
+            color: AppColors.surface,
+            child: SingleChildScrollView(
+              controller: _scrollController,
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.all(14),
+              child: SizedBox(
+                width: bracketViewportWidth,
+                height: 690,
+                child: Center(
+                  child: SizedBox(
+                    width: 1120,
+                    height: 690,
+                    child: Stack(
+                      children: [
+                        Positioned.fill(
+                          child: CustomPaint(
+                            painter: _BracketLinesPainter(),
+                          ),
+                        ),
+                        Positioned(
+                          top: 22,
+                          left: 428,
+                          right: 428,
+                          child: _CenterBadge(
+                            participantsCount: widget.participants.length,
+                          ),
+                        ),
+                        ..._buildFirstRoundSlots(firstRound),
+                        const Positioned(
+                          left: 514,
+                          top: 330,
+                          child: _FinalSlot(),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-                Positioned(
-                  top: 22,
-                  left: 428,
-                  right: 428,
-                  child: _CenterBadge(participantsCount: participants.length),
-                ),
-                ..._buildFirstRoundSlots(firstRound),
-                const Positioned(
-                  left: 514,
-                  top: 330,
-                  child: _FinalSlot(),
-                ),
-              ],
+              ),
             ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 

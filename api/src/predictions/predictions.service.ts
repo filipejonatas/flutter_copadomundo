@@ -363,8 +363,8 @@ export class PredictionsService {
     const configuredStartAt = this.configService.get<string>('PLAYOFF_START_AT');
     const startAt = configuredStartAt
       ? new Date(configuredStartAt)
-      : new Date('2026-06-29T03:00:00.000Z');
-    if (Number.isNaN(startAt.getTime())) return new Date('2026-06-29T03:00:00.000Z');
+      : new Date('2026-06-28T03:00:00.000Z');
+    if (Number.isNaN(startAt.getTime())) return new Date('2026-06-28T03:00:00.000Z');
     return startAt;
   }
 
