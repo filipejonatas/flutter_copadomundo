@@ -75,7 +75,7 @@ export class PlayoffsService {
       matches
         .filter(
           (match) =>
-            match.round === round &&
+            this.sameRound(match.round, round) &&
             this.isPlayoffMatch(match) &&
             this.isFinished(match),
         )
@@ -356,6 +356,28 @@ export class PlayoffsService {
 
   private isPlayoffMatch(match: WorldCupMatch): boolean {
     return new Date(match.kickoffAt).getTime() >= this.playoffStartAt().getTime();
+  }
+
+  private sameRound(matchRound: string, requestedRound: string): boolean {
+    return this.roundKey(matchRound) === this.roundKey(requestedRound);
+  }
+
+  private roundKey(round: string): string {
+    const normalized = round.trim().toUpperCase().replace(/[\s-]+/g, '_');
+    if (['RD32', 'R32', 'ROUND_OF_32', '1/16', '16_AVOS'].includes(normalized)) {
+      return 'round_of_32';
+    }
+    if (['RD16', 'R16', 'ROUND_OF_16', '1/8', 'OITAVAS'].includes(normalized)) {
+      return 'round_of_16';
+    }
+    if (['QF', 'QUARTER', 'QUARTER_FINAL', 'QUARTER_FINALS', 'QUARTAS'].includes(normalized)) {
+      return 'quarter_final';
+    }
+    if (['SF', 'SEMI', 'SEMI_FINAL', 'SEMI_FINALS', 'SEMIS'].includes(normalized)) {
+      return 'semi_final';
+    }
+    if (['F', 'FINAL'].includes(normalized)) return 'final';
+    return normalized.toLowerCase();
   }
 
   private isPlayoffActive(now = new Date()): boolean {

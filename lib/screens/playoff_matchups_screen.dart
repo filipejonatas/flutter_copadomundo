@@ -54,7 +54,8 @@ class _PlayoffMatchupsScreenState extends State<PlayoffMatchupsScreen> {
     final theme = Theme.of(context);
     final rounds = _rounds;
     final selectedRound = rounds.isEmpty ? null : rounds[_roundIndex];
-    final safeMatchIndex = selectedRound == null || selectedRound.matches.isEmpty
+    final safeMatchIndex =
+        selectedRound == null || selectedRound.matches.isEmpty
         ? 0
         : _matchIndex.clamp(0, selectedRound.matches.length - 1).toInt();
     final selectedMatch = selectedRound == null || selectedRound.matches.isEmpty
@@ -153,25 +154,24 @@ class _PlayoffMatchupsScreenState extends State<PlayoffMatchupsScreen> {
       grouped.putIfAbsent(match.round, () => []).add(match);
     }
 
-    final rounds = grouped.entries
-        .map(
-          (entry) => _PlayoffRound(
-            code: entry.key,
-            label: _roundLabel(entry.key),
-            matches: entry.value
-              ..sort((a, b) => a.position.compareTo(b.position)),
-          ),
-        )
-        .toList()
-      ..sort((a, b) => _roundOrder(a.code).compareTo(_roundOrder(b.code)));
+    final rounds =
+        grouped.entries
+            .map(
+              (entry) => _PlayoffRound(
+                code: entry.key,
+                label: _roundLabel(entry.key),
+                matches: entry.value
+                  ..sort((a, b) => a.position.compareTo(b.position)),
+              ),
+            )
+            .toList()
+          ..sort((a, b) => _roundOrder(a.code).compareTo(_roundOrder(b.code)));
 
     return rounds;
   }
 
   Map<String, PlayoffRoundScore> get _scoresByUserId {
-    return {
-      for (final score in _roundScores) score.userId: score,
-    };
+    return {for (final score in _roundScores) score.userId: score};
   }
 
   Future<void> _loadBracket() async {
@@ -248,7 +248,9 @@ class _PlayoffMatchupsScreenState extends State<PlayoffMatchupsScreen> {
     final finishedMatches = matches
         .where(
           (match) =>
-              match.round == round && match.isPlayoffMatch && match.isFinished,
+              _sameRound(match.round, round) &&
+              match.isPlayoffMatch &&
+              match.isFinished,
         )
         .toList();
 
@@ -378,6 +380,33 @@ class _PlayoffMatchupsScreenState extends State<PlayoffMatchupsScreen> {
     };
   }
 
+  bool _sameRound(String matchRound, String selectedRound) {
+    return _roundKey(matchRound) == _roundKey(selectedRound);
+  }
+
+  String _roundKey(String round) {
+    final normalized = round.trim().toUpperCase().replaceAll(
+      RegExp(r'[\s-]+'),
+      '_',
+    );
+    return switch (normalized) {
+      'RD32' || 'R32' || 'ROUND_OF_32' || '1/16' || '16_AVOS' => 'round_of_32',
+      'RD16' || 'R16' || 'ROUND_OF_16' || '1/8' || 'OITAVAS' => 'round_of_16',
+      'QF' ||
+      'QUARTER' ||
+      'QUARTER_FINAL' ||
+      'QUARTER_FINALS' ||
+      'QUARTAS' => 'quarter_final',
+      'SF' ||
+      'SEMI' ||
+      'SEMI_FINAL' ||
+      'SEMI_FINALS' ||
+      'SEMIS' => 'semi_final',
+      'F' || 'FINAL' => 'final',
+      _ => normalized.toLowerCase(),
+    };
+  }
+
   void _showMessage(String message) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
@@ -408,9 +437,7 @@ class _MatchupDropdown extends StatelessWidget {
     return DropdownButtonFormField<int>(
       value: selectedIndex < 0 ? 0 : selectedIndex,
       icon: PhosphorIcon(PhosphorIcons.caretDown()),
-      decoration: const InputDecoration(
-        labelText: 'Resultado dos confrontos',
-      ),
+      decoration: const InputDecoration(labelText: 'Resultado dos confrontos'),
       items: [
         for (var index = 0; index < round.matches.length; index++)
           DropdownMenuItem(
@@ -434,9 +461,12 @@ class _RoundStatusBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isFinished = match.status.toLowerCase() == 'finished' ||
+    final isFinished =
+        match.status.toLowerCase() == 'finished' ||
         match.status.toLowerCase() == 'done';
-    final color = isFinished ? AppColors.primaryAccent : AppColors.textSecondary;
+    final color = isFinished
+        ? AppColors.primaryAccent
+        : AppColors.textSecondary;
 
     return Container(
       padding: const EdgeInsets.all(12),
@@ -488,7 +518,9 @@ class _MatchupComparison extends StatelessWidget {
       children: [
         _CompetitorScoreCard(
           participant: participantA,
-          score: participantA == null ? null : scoresByUserId[participantA.userId],
+          score: participantA == null
+              ? null
+              : scoresByUserId[participantA.userId],
           isWinner: participantA?.userId == match.winnerParticipantId,
         ),
         const SizedBox(height: 12),
@@ -496,7 +528,9 @@ class _MatchupComparison extends StatelessWidget {
         const SizedBox(height: 12),
         _CompetitorScoreCard(
           participant: participantB,
-          score: participantB == null ? null : scoresByUserId[participantB.userId],
+          score: participantB == null
+              ? null
+              : scoresByUserId[participantB.userId],
           isWinner: participantB?.userId == match.winnerParticipantId,
         ),
         const SizedBox(height: 14),
@@ -639,10 +673,7 @@ class _PredictionResultRow extends StatelessWidget {
 }
 
 class _PredictionPill extends StatelessWidget {
-  const _PredictionPill({
-    required this.participant,
-    required this.prediction,
-  });
+  const _PredictionPill({required this.participant, required this.prediction});
 
   final PlayoffParticipant? participant;
   final PublicPredictionResult? prediction;
@@ -949,7 +980,9 @@ class _StatusChip extends StatelessWidget {
       'finished' || 'done' => 'Finalizado',
       _ => status,
     };
-    final color = isFinished ? AppColors.primaryAccent : AppColors.textSecondary;
+    final color = isFinished
+        ? AppColors.primaryAccent
+        : AppColors.textSecondary;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
