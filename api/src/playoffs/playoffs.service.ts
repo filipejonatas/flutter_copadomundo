@@ -385,7 +385,14 @@ export class PlayoffsService {
   }
 
   private asPredictions(value: unknown): Record<string, UserMatchPrediction> {
-    if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+    if (Array.isArray(value)) {
+      return Object.fromEntries(
+        value
+          .map((item, index) => [String(index), item])
+          .filter(([, item]) => item && typeof item === 'object' && !Array.isArray(item)),
+      ) as Record<string, UserMatchPrediction>;
+    }
+    if (!value || typeof value !== 'object') return {};
     return value as Record<string, UserMatchPrediction>;
   }
 

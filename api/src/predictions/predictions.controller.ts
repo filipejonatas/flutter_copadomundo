@@ -51,12 +51,14 @@ export class PredictionsController {
     await this.authService.verifyAppCheckHeader(appCheckToken);
     const user = await this.authService.verifyAuthorizationHeader(authorization);
     if (Array.isArray(body.predictions)) {
+      const fixtureIds: number[] = [];
       for (const item of body.predictions) {
         const fixtureId = this.predictionsService.validFixtureId(
           (item as SavePredictionBody).fixtureId,
         );
-        this.predictionRateLimit.checkUser(user.uid, ip, fixtureId);
+        fixtureIds.push(fixtureId);
       }
+      this.predictionRateLimit.checkUserBulk(user.uid, ip, fixtureIds);
     }
     return this.predictionsService.savePredictionsBulk(user, body);
   }

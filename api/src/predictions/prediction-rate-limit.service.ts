@@ -42,6 +42,19 @@ export class PredictionRateLimitService {
     this.consume(`ip-fixture:${ip || 'unknown'}:${fixtureId}`, this.fixtureLimit, this.fixtureWindowMs);
   }
 
+  checkUserBulk(uid: string, ip: string, fixtureIds: number[]): void {
+    this.consume(`user:${uid}`, this.userLimit, this.windowMs);
+
+    for (const fixtureId of new Set(fixtureIds)) {
+      this.consume(`fixture:${uid}:${fixtureId}`, this.fixtureLimit, this.fixtureWindowMs);
+      this.consume(
+        `ip-fixture:${ip || 'unknown'}:${fixtureId}`,
+        this.fixtureLimit,
+        this.fixtureWindowMs,
+      );
+    }
+  }
+
   private consume(key: string, limit: number, windowMs: number): void {
     const now = Date.now();
     const bucket = this.buckets.get(key);

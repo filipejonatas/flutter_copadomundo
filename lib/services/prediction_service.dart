@@ -75,6 +75,12 @@ class PredictionService {
   }
 
   Map<int, UserMatchPrediction> parseUserPredictions(Object? rawData) {
+    if (rawData is List) {
+      return parseUserPredictions({
+        for (var index = 0; index < rawData.length; index++)
+          if (rawData[index] != null) '$index': rawData[index],
+      });
+    }
     if (rawData is! Map) return <int, UserMatchPrediction>{};
 
     final predictions = <int, UserMatchPrediction>{};

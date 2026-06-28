@@ -107,7 +107,7 @@ class _PredictionsScreenState extends State<PredictionsScreen> {
                           )
                         : PhosphorIcon(PhosphorIcons.floppyDisk()),
                     label: Text(
-                      _isSavingAll ? 'Salvando palpites...' : 'Salvar todos',
+                      _isSavingAll ? 'Salvando palpites...' : 'Salvar dia',
                     ),
                   ),
                 ),
@@ -157,18 +157,30 @@ class _PredictionsScreenState extends State<PredictionsScreen> {
   bool get _canSaveAll {
     return !_isSavingAll &&
         _savingFixtureId == null &&
-        _matches.any((match) => match.isPredictionOpen());
+        _visibleDayMatches.any((match) => match.isPredictionOpen());
+  }
+
+  List<MatchPrediction> get _visibleDayMatches {
+    final matchDays = _matchDays;
+    if (matchDays.isEmpty || _dayIndex >= matchDays.length) {
+      return const <MatchPrediction>[];
+    }
+    return matchDays[_dayIndex].matches;
   }
 
   List<_MatchDay> _buildMatchDays(List<MatchPrediction> matches) {
-    final days = <String, List<MatchPrediction>>{};
+    final days = <String, _MatchDay>{};
     for (final match in matches) {
-      days.putIfAbsent(_dayLabel(match), () => []).add(match);
+      final key = _dayKey(match);
+      final label = _dayLabel(match);
+      final day = days.putIfAbsent(
+        key,
+        () => _MatchDay(label: label, matches: <MatchPrediction>[]),
+      );
+      day.matches.add(match);
     }
 
-    return days.entries
-        .map((entry) => _MatchDay(label: entry.key, matches: entry.value))
-        .toList();
+    return days.values.toList();
   }
 
   Future<void> _loadPredictions() async {
@@ -267,7 +279,7 @@ class _PredictionsScreenState extends State<PredictionsScreen> {
     if (user == null) return;
 
     final predictions = <MatchPrediction, UserMatchPrediction>{};
-    for (final match in _matches) {
+    for (final match in _visibleDayMatches) {
       final prediction = _drafts[match.fixtureId];
       if (prediction == null || !match.isPredictionOpen()) continue;
       predictions[match] = prediction;
@@ -289,7 +301,7 @@ class _PredictionsScreenState extends State<PredictionsScreen> {
           _picks[entry.key.fixtureId] = entry.value;
         }
       });
-      _showMessage('${predictions.length} palpites salvos.');
+      _showMessage('${predictions.length} palpites do dia salvos.');
     } catch (error) {
       debugPrint('Falha ao salvar todos os palpites: $error');
       if (!mounted) return;
@@ -300,9 +312,41 @@ class _PredictionsScreenState extends State<PredictionsScreen> {
   }
 
   String _dayLabel(MatchPrediction match) {
+    final kickoff = DateTime.tryParse(match.kickoffAt);
+    if (kickoff != null) {
+      final local = kickoff.toLocal();
+      return '${local.day.toString().padLeft(2, '0')} ${_monthLabel(local.month)}';
+    }
+
     final labelParts = match.kickoffLabel.split(',');
     if (labelParts.isEmpty) return 'Dia do jogo';
     return labelParts.first.trim();
+  }
+
+  String _dayKey(MatchPrediction match) {
+    final kickoff = DateTime.tryParse(match.kickoffAt);
+    if (kickoff == null) return _dayLabel(match);
+
+    final local = kickoff.toLocal();
+    return '${local.year}-${local.month.toString().padLeft(2, '0')}-${local.day.toString().padLeft(2, '0')}';
+  }
+
+  String _monthLabel(int month) {
+    return switch (month) {
+      1 => 'jan',
+      2 => 'fev',
+      3 => 'mar',
+      4 => 'abr',
+      5 => 'mai',
+      6 => 'jun',
+      7 => 'jul',
+      8 => 'ago',
+      9 => 'set',
+      10 => 'out',
+      11 => 'nov',
+      12 => 'dez',
+      _ => '',
+    };
   }
 
   void _showMessage(String message) {
