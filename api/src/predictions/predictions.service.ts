@@ -4,6 +4,7 @@ import { DecodedIdToken } from 'firebase-admin/auth';
 import { ServerValue } from 'firebase-admin/database';
 import { WorldCupMatch } from '../matches/world-cup-match';
 import { MatchesService } from '../matches/matches.service';
+import { isFinishedMatch } from '../matches/match-status';
 import { FirebaseAdminService } from '../firebase-admin.service';
 
 export type MatchPick = 'home' | 'draw' | 'away';
@@ -54,6 +55,8 @@ export interface MatchPredictionResultsResponse {
   status: string;
   homeScore: number;
   awayScore: number;
+  homePenaltyScore?: number;
+  awayPenaltyScore?: number;
   qualifiedPick?: Exclude<MatchPick, 'draw'>;
   predictions: MatchPredictionResult[];
 }
@@ -134,7 +137,7 @@ export class PredictionsService {
     if (!match) {
       throw new BadRequestException('Jogo nao encontrado.');
     }
-    if (!this.isFinished(match) || match.homeScore === undefined || match.awayScore === undefined) {
+    if (!isFinishedMatch(match) || match.homeScore === undefined || match.awayScore === undefined) {
       throw new BadRequestException('Palpites ficam disponiveis apenas apos o fim do jogo.');
     }
 
@@ -192,6 +195,12 @@ export class PredictionsService {
       status: match.status,
       homeScore: match.homeScore,
       awayScore: match.awayScore,
+      ...(match.homePenaltyScore === undefined
+        ? {}
+        : { homePenaltyScore: match.homePenaltyScore }),
+      ...(match.awayPenaltyScore === undefined
+        ? {}
+        : { awayPenaltyScore: match.awayPenaltyScore }),
       ...(match.qualifiedPick === undefined ? {} : { qualifiedPick: match.qualifiedPick }),
       predictions: results,
     };
@@ -312,8 +321,7 @@ export class PredictionsService {
       return { points: 0, exactScore: false, correctPick: false };
     }
 
-    const actualPick =
-      match.qualifiedPick ?? this.pickFromScore(match.homeScore, match.awayScore);
+    const actualPick = this.actualPlayoffQualifiedPick(match);
     const predictedQualified = prediction.qualifiedPick ?? prediction.pick;
     const correctPick = predictedQualified === actualPick;
     if (!correctPick) return { points: 0, exactScore: false, correctPick: false };
@@ -346,17 +354,20 @@ export class PredictionsService {
     };
   }
 
-  private isFinished(match: WorldCupMatch): boolean {
-    if (match.homeScore === undefined || match.awayScore === undefined) {
-      return false;
-    }
-    return ['FT', 'FINAL', 'FINISHED', 'AET', 'PEN'].includes(
-      match.status.trim().toUpperCase(),
-    );
-  }
-
   private isPlayoffMatch(match: WorldCupMatch): boolean {
     return new Date(match.kickoffAt).getTime() >= this.playoffStartAt().getTime();
+  }
+
+  private actualPlayoffQualifiedPick(match: WorldCupMatch): MatchPick {
+    if (match.qualifiedPick !== undefined) return match.qualifiedPick;
+    if (
+      match.homePenaltyScore !== undefined &&
+      match.awayPenaltyScore !== undefined
+    ) {
+      if (match.homePenaltyScore > match.awayPenaltyScore) return 'home';
+      if (match.awayPenaltyScore > match.homePenaltyScore) return 'away';
+    }
+    return this.pickFromScore(match.homeScore!, match.awayScore!);
   }
 
   private playoffStartAt(): Date {

@@ -8,5 +8,7 @@ export interface WorldCupMatch {
   status: string;
   homeScore?: number;
   awayScore?: number;
+  homePenaltyScore?: number;
+  awayPenaltyScore?: number;
   qualifiedPick?: 'home' | 'away';
 }

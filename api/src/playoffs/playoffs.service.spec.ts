@@ -4,6 +4,7 @@ import { PlayoffsService } from './playoffs.service';
 import { PlayoffSeedSource } from './playoffs.types';
 import { UserMatchPrediction } from '../predictions/predictions.service';
 import { WorldCupMatch } from '../matches/world-cup-match';
+import { isFinishedMatch } from '../matches/match-status';
 
 function prediction(
   homeScore: number,
@@ -77,6 +78,70 @@ test('calculatePredictionPoints accepts qualifiedPick for tied knockout guesses'
   assert.equal(
     PlayoffsService.calculatePredictionPoints(tiedPrediction, penaltyMatch),
     10,
+  );
+});
+
+test('calculatePredictionPoints accepts FT_PEN penalty shootout status', () => {
+  const tiedPrediction: UserMatchPrediction = {
+    ...prediction(1, 1, 'draw'),
+    qualifiedPick: 'away',
+  };
+  const penaltyMatch: WorldCupMatch = {
+    ...finishedMatch,
+    homeScore: 1,
+    awayScore: 1,
+    status: 'FT_PEN',
+    qualifiedPick: 'away',
+  };
+
+  assert.equal(
+    PlayoffsService.calculatePredictionPoints(tiedPrediction, penaltyMatch),
+    10,
+  );
+});
+
+test('calculatePredictionPoints derives penalty winner from penalty score', () => {
+  const exactPrediction: UserMatchPrediction = {
+    ...prediction(1, 1, 'draw'),
+    qualifiedPick: 'away',
+  };
+  const sameDifferencePrediction: UserMatchPrediction = {
+    ...prediction(2, 2, 'draw'),
+    qualifiedPick: 'away',
+  };
+  const penaltyMatch: WorldCupMatch = {
+    ...finishedMatch,
+    homeTeam: 'Netherlands',
+    awayTeam: 'Morocco',
+    homeScore: 1,
+    awayScore: 1,
+    homePenaltyScore: 2,
+    awayPenaltyScore: 3,
+    status: 'FT_PEN',
+  };
+
+  assert.equal(
+    PlayoffsService.calculatePredictionPoints(exactPrediction, penaltyMatch),
+    10,
+  );
+  assert.equal(
+    PlayoffsService.calculatePredictionPoints(
+      sameDifferencePrediction,
+      penaltyMatch,
+    ),
+    7,
+  );
+});
+
+test('isFinishedMatch treats FT_PEN matches with scores as finished', () => {
+  assert.equal(
+    isFinishedMatch({
+      ...finishedMatch,
+      status: 'FT_PEN',
+      homeScore: 1,
+      awayScore: 1,
+    }),
+    true,
   );
 });
 

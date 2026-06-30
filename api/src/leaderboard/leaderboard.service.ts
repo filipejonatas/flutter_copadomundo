@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { ServerValue } from 'firebase-admin/database';
 import { FirebaseAdminService } from '../firebase-admin.service';
 import { MatchesService } from '../matches/matches.service';
+import { isFinishedMatch } from '../matches/match-status';
 import { WorldCupMatch } from '../matches/world-cup-match';
 import { PredictionsService, UserMatchPrediction } from '../predictions/predictions.service';
 
@@ -36,7 +37,7 @@ export class LeaderboardService {
     const matches = await this.matchesService.getWorldCup2026Matches();
     const finishedMatches = Object.fromEntries(
       matches
-        .filter((match) => this.isFinished(match))
+        .filter((match) => isFinishedMatch(match))
         .map((match) => [String(match.fixtureId), match]),
     );
     const [usersSnapshot, predictionsSnapshot] = await Promise.all([
@@ -104,9 +105,7 @@ export class LeaderboardService {
         prediction,
         match,
       );
-      const actualPick =
-        match.qualifiedPick ??
-        this.predictionsService.pickFromScore(match.homeScore, match.awayScore);
+      const actualPick = this.actualPick(match);
 
       predictionsCount++;
       points += score.points;
@@ -119,6 +118,12 @@ export class LeaderboardService {
         result: actualPick,
         homeScore: match.homeScore,
         awayScore: match.awayScore,
+        ...(match.homePenaltyScore === undefined
+          ? {}
+          : { homePenaltyScore: match.homePenaltyScore }),
+        ...(match.awayPenaltyScore === undefined
+          ? {}
+          : { awayPenaltyScore: match.awayPenaltyScore }),
         predictedHomeScore: prediction.homeScore,
         predictedAwayScore: prediction.awayScore,
         points: score.points,
@@ -133,15 +138,6 @@ export class LeaderboardService {
       exactScores,
       matches: matchScores,
     };
-  }
-
-  private isFinished(match: WorldCupMatch): boolean {
-    if (match.homeScore === undefined || match.awayScore === undefined) {
-      return false;
-    }
-    return ['FT', 'FINAL', 'FINISHED', 'AET', 'PEN'].includes(
-      match.status.trim().toUpperCase(),
-    );
   }
 
   private persistScore(
@@ -163,6 +159,18 @@ export class LeaderboardService {
       matches: score.matches,
       updatedAt: ServerValue.TIMESTAMP,
     });
+  }
+
+  private actualPick(match: WorldCupMatch) {
+    if (match.qualifiedPick !== undefined) return match.qualifiedPick;
+    if (
+      match.homePenaltyScore !== undefined &&
+      match.awayPenaltyScore !== undefined
+    ) {
+      if (match.homePenaltyScore > match.awayPenaltyScore) return 'home';
+      if (match.awayPenaltyScore > match.homePenaltyScore) return 'away';
+    }
+    return this.predictionsService.pickFromScore(match.homeScore!, match.awayScore!);
   }
 
   private asRecord(value: unknown): Record<string, unknown> {

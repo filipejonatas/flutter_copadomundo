@@ -27,6 +27,8 @@ class MatchPrediction {
     required this.status,
     this.homeScore,
     this.awayScore,
+    this.homePenaltyScore,
+    this.awayPenaltyScore,
     this.qualifiedPick,
   });
 
@@ -39,16 +41,15 @@ class MatchPrediction {
   final String status;
   final int? homeScore;
   final int? awayScore;
+  final int? homePenaltyScore;
+  final int? awayPenaltyScore;
   final MatchPick? qualifiedPick;
 
   bool get hasResult => homeScore != null && awayScore != null;
 
   bool get isFinished {
     if (!hasResult) return false;
-    return switch (status.trim().toUpperCase()) {
-      'FT' || 'FINAL' || 'FINISHED' || 'AET' || 'PEN' => true,
-      _ => false,
-    };
+    return isFinishedMatchStatus(status);
   }
 
   bool get isPlayoffMatch {
@@ -64,9 +65,7 @@ class MatchPrediction {
 
     final kickoff = DateTime.tryParse(kickoffAt);
     if (kickoff == null) return false;
-    return !kickoff.toUtc().isBefore(
-      DateTime.utc(2026, 6, 28, 3),
-    );
+    return !kickoff.toUtc().isBefore(DateTime.utc(2026, 6, 28, 3));
   }
 
   bool get hasValidKickoff => DateTime.tryParse(kickoffAt) != null;
@@ -91,6 +90,8 @@ class MatchPrediction {
       status: json['status'] as String,
       homeScore: intFromStorageValue(json['homeScore']),
       awayScore: intFromStorageValue(json['awayScore']),
+      homePenaltyScore: intFromStorageValue(json['homePenaltyScore']),
+      awayPenaltyScore: intFromStorageValue(json['awayPenaltyScore']),
       qualifiedPick: pickFromStorageValue(json['qualifiedPick']),
     );
   }
@@ -106,6 +107,8 @@ class MatchPredictionResults {
     required this.homeScore,
     required this.awayScore,
     required this.predictions,
+    this.homePenaltyScore,
+    this.awayPenaltyScore,
     this.qualifiedPick,
   });
 
@@ -116,6 +119,8 @@ class MatchPredictionResults {
   final String status;
   final int homeScore;
   final int awayScore;
+  final int? homePenaltyScore;
+  final int? awayPenaltyScore;
   final MatchPick? qualifiedPick;
   final List<PublicPredictionResult> predictions;
 
@@ -128,12 +133,13 @@ class MatchPredictionResults {
       status: json['status'] as String,
       homeScore: intFromStorageValue(json['homeScore']) ?? 0,
       awayScore: intFromStorageValue(json['awayScore']) ?? 0,
+      homePenaltyScore: intFromStorageValue(json['homePenaltyScore']),
+      awayPenaltyScore: intFromStorageValue(json['awayPenaltyScore']),
       qualifiedPick: pickFromStorageValue(json['qualifiedPick']),
       predictions: (json['predictions'] as List<dynamic>? ?? [])
           .map(
-            (item) => PublicPredictionResult.fromJson(
-              item as Map<String, dynamic>,
-            ),
+            (item) =>
+                PublicPredictionResult.fromJson(item as Map<String, dynamic>),
           )
           .toList(),
     );
@@ -175,10 +181,8 @@ class PublicPredictionResult {
       photoUrl: json['photoUrl'] as String?,
       pick: pickFromStorageValue(json['pick']) ?? MatchPick.draw,
       qualifiedPick: pickFromStorageValue(json['qualifiedPick']),
-      predictedHomeScore:
-          intFromStorageValue(json['predictedHomeScore']) ?? 0,
-      predictedAwayScore:
-          intFromStorageValue(json['predictedAwayScore']) ?? 0,
+      predictedHomeScore: intFromStorageValue(json['predictedHomeScore']) ?? 0,
+      predictedAwayScore: intFromStorageValue(json['predictedAwayScore']) ?? 0,
       points: intFromStorageValue(json['points']) ?? 0,
       exactScore: json['exactScore'] == true,
       correctPick: json['correctPick'] == true,
@@ -194,6 +198,13 @@ bool _isPreMatchStatus(String status) {
     'SCHEDULED' ||
     'NOT_STARTED' ||
     'PRE_MATCH' => true,
+    _ => false,
+  };
+}
+
+bool isFinishedMatchStatus(String status) {
+  return switch (status.trim().toUpperCase()) {
+    'FT' || 'FINAL' || 'FINISHED' || 'AET' || 'PEN' || 'FT_PEN' => true,
     _ => false,
   };
 }

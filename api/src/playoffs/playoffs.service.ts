@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { ServerValue } from 'firebase-admin/database';
 import { FirebaseAdminService } from '../firebase-admin.service';
 import { LeaderboardService } from '../leaderboard/leaderboard.service';
+import { isFinishedMatch } from '../matches/match-status';
 import { MatchesService } from '../matches/matches.service';
 import { WorldCupMatch } from '../matches/world-cup-match';
 import {
@@ -77,7 +78,7 @@ export class PlayoffsService {
           (match) =>
             this.sameRound(match.round, round) &&
             this.isPlayoffMatch(match) &&
-            this.isFinished(match),
+            isFinishedMatch(match),
         )
         .map((match) => [String(match.fixtureId), match]),
     );
@@ -228,9 +229,7 @@ export class PlayoffsService {
   ): number {
     if (match.homeScore === undefined || match.awayScore === undefined) return 0;
 
-    const actualPick =
-      match.qualifiedPick ??
-      PlayoffsService.pickFromScore(match.homeScore, match.awayScore);
+    const actualPick = PlayoffsService.actualQualifiedPick(match);
     const predictedQualified = prediction.qualifiedPick ?? prediction.pick;
     if (predictedQualified !== actualPick) return 0;
 
@@ -345,13 +344,16 @@ export class PlayoffsService {
     return homeScore > awayScore ? 'home' : 'away';
   }
 
-  private isFinished(match: WorldCupMatch): boolean {
-    if (match.homeScore === undefined || match.awayScore === undefined) {
-      return false;
+  private static actualQualifiedPick(match: WorldCupMatch): MatchPick {
+    if (match.qualifiedPick !== undefined) return match.qualifiedPick;
+    if (
+      match.homePenaltyScore !== undefined &&
+      match.awayPenaltyScore !== undefined
+    ) {
+      if (match.homePenaltyScore > match.awayPenaltyScore) return 'home';
+      if (match.awayPenaltyScore > match.homePenaltyScore) return 'away';
     }
-    return ['FT', 'FINAL', 'FINISHED', 'AET', 'PEN'].includes(
-      match.status.trim().toUpperCase(),
-    );
+    return PlayoffsService.pickFromScore(match.homeScore!, match.awayScore!);
   }
 
   private isPlayoffMatch(match: WorldCupMatch): boolean {

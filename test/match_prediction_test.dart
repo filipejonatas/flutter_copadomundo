@@ -71,6 +71,50 @@ void main() {
     });
   });
 
+  group('MatchPrediction.isFinished', () {
+    test('treats FT_PEN as a finished match', () {
+      const match = MatchPrediction(
+        fixtureId: 1,
+        round: 'Round of 32',
+        kickoffLabel: '29 jun, 16:00',
+        kickoffAt: '2026-06-29T19:00:00Z',
+        homeTeam: 'Brazil',
+        awayTeam: 'France',
+        status: 'FT_PEN',
+        homeScore: 1,
+        awayScore: 1,
+        qualifiedPick: MatchPick.home,
+      );
+
+      expect(match.isFinished, isTrue);
+      expect(match.isPredictionOpen(), isFalse);
+    });
+  });
+
+  group('MatchPrediction.fromJson', () {
+    test('parses penalty score and qualified pick', () {
+      final match = MatchPrediction.fromJson({
+        'fixtureId': 101,
+        'round': 'R32',
+        'kickoffLabel': '29 jun, 22:00',
+        'kickoffAt': '2026-06-30T01:00:00Z',
+        'homeTeam': 'Netherlands',
+        'awayTeam': 'Morocco',
+        'status': 'FT_PEN',
+        'homeScore': 1,
+        'awayScore': 1,
+        'homePenaltyScore': 2,
+        'awayPenaltyScore': 3,
+        'qualifiedPick': 'away',
+      });
+
+      expect(match.homePenaltyScore, 2);
+      expect(match.awayPenaltyScore, 3);
+      expect(match.qualifiedPick, MatchPick.away);
+      expect(match.isFinished, isTrue);
+    });
+  });
+
   group('isValidPredictionScore', () {
     test('accepts scores from 0 to 9', () {
       // Arrange

@@ -186,13 +186,32 @@ void main() {
         );
         const scheduledMatch = MatchCard(match: futureMatch);
         const finishedMatch = MatchCard(match: lockedMatch);
+        const penaltyMatch = MatchCard(
+          match: MatchPrediction(
+            fixtureId: 104,
+            round: 'Round of 32',
+            kickoffLabel: '29 jun, 16:00',
+            kickoffAt: '2026-06-29T19:00:00Z',
+            homeTeam: 'Brazil',
+            awayTeam: 'France',
+            status: 'FT_PEN',
+            homeScore: 1,
+            awayScore: 1,
+            qualifiedPick: MatchPick.home,
+          ),
+        );
 
         // Act
         await tester.pumpWidget(
           buildTestApp(
             const SingleChildScrollView(
               child: Column(
-                children: [liveMatch, scheduledMatch, finishedMatch],
+                children: [
+                  liveMatch,
+                  scheduledMatch,
+                  finishedMatch,
+                  penaltyMatch,
+                ],
               ),
             ),
           ),
@@ -201,6 +220,7 @@ void main() {
         // Assert
         expect(find.text('Live'), findsOneWidget);
         expect(find.text('FT'), findsOneWidget);
+        expect(find.text('PEN'), findsOneWidget);
         expect(find.text('Today'), findsOneWidget);
       },
     );

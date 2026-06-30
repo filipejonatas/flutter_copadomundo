@@ -13,7 +13,11 @@ import '../widgets/match_card.dart';
 
 /// Matches screen showing official scores and status cards by date.
 class ResultsScreen extends StatefulWidget {
-  const ResultsScreen({super.key, this.predictionService, this.sessionController});
+  const ResultsScreen({
+    super.key,
+    this.predictionService,
+    this.sessionController,
+  });
 
   final PredictionService? predictionService;
   final SessionController? sessionController;
@@ -70,20 +74,22 @@ class _ResultsScreenState extends State<ResultsScreen> {
               for (final match in visibleDay.matches)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 12),
-                  child: MatchCard(
-                    match: match,
-                    footer: _ResultActions(
-                      match: match,
-                      onOpenPredictions:
-                          widget.sessionController?.currentUser == null ||
-                              !match.isFinished
-                          ? null
-                          : () => _openPredictionResults(match),
-                    ),
-                  )
-                      .animate()
-                      .fadeIn(duration: 220.ms)
-                      .slideY(begin: .06, end: 0),
+                  child:
+                      MatchCard(
+                            match: match,
+                            footer: _ResultActions(
+                              match: match,
+                              onOpenPredictions:
+                                  widget.sessionController?.currentUser ==
+                                          null ||
+                                      !match.isFinished
+                                  ? null
+                                  : () => _openPredictionResults(match),
+                            ),
+                          )
+                          .animate()
+                          .fadeIn(duration: 220.ms)
+                          .slideY(begin: .06, end: 0),
                 ),
               if (matchDays.length > 1)
                 _MatchDaysPager(
@@ -185,10 +191,7 @@ class _ResultsScreenState extends State<ResultsScreen> {
 }
 
 class _ResultActions extends StatelessWidget {
-  const _ResultActions({
-    required this.match,
-    required this.onOpenPredictions,
-  });
+  const _ResultActions({required this.match, required this.onOpenPredictions});
 
   final MatchPrediction match;
   final VoidCallback? onOpenPredictions;
@@ -198,7 +201,9 @@ class _ResultActions extends StatelessWidget {
     return Row(
       children: [
         PhosphorIcon(
-          match.isFinished ? PhosphorIcons.checkCircle() : PhosphorIcons.clock(),
+          match.isFinished
+              ? PhosphorIcons.checkCircle()
+              : PhosphorIcons.clock(),
           size: 16,
           color: match.isFinished
               ? AppColors.primaryAccent
@@ -241,8 +246,8 @@ class _PredictionResultsSheet extends StatefulWidget {
 }
 
 class _PredictionResultsSheetState extends State<_PredictionResultsSheet> {
-  late final Future<MatchPredictionResults> _future =
-      widget.predictionService.loadMatchPredictionResults(
+  late final Future<MatchPredictionResults> _future = widget.predictionService
+      .loadMatchPredictionResults(
         user: widget.user,
         fixtureId: widget.match.fixtureId,
       );
@@ -284,10 +289,7 @@ class _PredictionResultsSheetState extends State<_PredictionResultsSheet> {
               builder: (context, controller) => ListView(
                 controller: controller,
                 children: [
-                  Text(
-                    '${result.homeTeam} ${result.homeScore} x ${result.awayScore} ${result.awayTeam}',
-                    style: theme.textTheme.titleLarge,
-                  ),
+                  Text(_resultTitle(result), style: theme.textTheme.titleLarge),
                   const SizedBox(height: 6),
                   Text(
                     '${result.predictions.length} palpites salvos',
@@ -309,6 +311,15 @@ class _PredictionResultsSheetState extends State<_PredictionResultsSheet> {
       ),
     );
   }
+}
+
+String _resultTitle(MatchPredictionResults result) {
+  final score =
+      '${result.homeTeam} ${result.homeScore} x ${result.awayScore} ${result.awayTeam}';
+  final homePenaltyScore = result.homePenaltyScore;
+  final awayPenaltyScore = result.awayPenaltyScore;
+  if (homePenaltyScore == null || awayPenaltyScore == null) return score;
+  return '$score (${homePenaltyScore} x $awayPenaltyScore pen.)';
 }
 
 class _PublicPredictionTile extends StatelessWidget {
@@ -371,7 +382,9 @@ class _PublicPredictionTile extends StatelessWidget {
             child: Text(
               '${prediction.points} pts',
               style: TextStyle(
-                color: prediction.points > 0 ? Colors.black : AppColors.textSecondary,
+                color: prediction.points > 0
+                    ? Colors.black
+                    : AppColors.textSecondary,
                 fontWeight: FontWeight.w900,
               ),
             ),

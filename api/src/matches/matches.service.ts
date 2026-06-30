@@ -163,8 +163,7 @@ export class MatchesService {
   }
 
   private toWorldCupMatches(payload: Wc2026MatchesResponse): WorldCupMatch[] {
-    return this.sortByKickoff(
-      payload.map((m) => {
+    const matches = payload.map((m) => {
         if (this.isWorldCupMatch(m)) return m;
 
         const kickoff = m.kickoff_utc ?? m.kickoff ?? new Date().toISOString();
@@ -179,10 +178,13 @@ export class MatchesService {
           status: m.phase ?? m.status ?? '',
           homeScore: this.resolveScore(m, 'home'),
           awayScore: this.resolveScore(m, 'away'),
+          homePenaltyScore: this.resolvePenaltyScore(m, 'home'),
+          awayPenaltyScore: this.resolvePenaltyScore(m, 'away'),
           ...(qualifiedPick === undefined ? {} : { qualifiedPick }),
         };
-      }),
-    );
+      });
+
+    return this.sortByKickoff(this.withDerivedKnockoutWinners(matches));
   }
 
   private async savePersistentMatchesCache(matches: WorldCupMatch[]): Promise<void> {
@@ -199,6 +201,12 @@ export class MatchesService {
           status: match.status,
           ...(match.homeScore === undefined ? {} : { homeScore: match.homeScore }),
           ...(match.awayScore === undefined ? {} : { awayScore: match.awayScore }),
+          ...(match.homePenaltyScore === undefined
+            ? {}
+            : { homePenaltyScore: match.homePenaltyScore }),
+          ...(match.awayPenaltyScore === undefined
+            ? {}
+            : { awayPenaltyScore: match.awayPenaltyScore }),
           ...(match.qualifiedPick === undefined
             ? {}
             : { qualifiedPick: match.qualifiedPick }),
@@ -229,7 +237,7 @@ export class MatchesService {
     const matches = value.matches.filter((item): item is WorldCupMatch =>
       this.isWorldCupMatch(item),
     );
-    return this.sortByKickoff(matches);
+    return this.sortByKickoff(this.withDerivedKnockoutWinners(matches));
   }
 
   private getMockWorldCup2026Matches(): WorldCupMatch[] {
@@ -354,11 +362,121 @@ export class MatchesService {
       return match.qualifiedPick;
     }
 
+    const penaltyWinner = this.qualifiedPickFromPenaltyScore({
+      homePenaltyScore: this.resolvePenaltyScore(match, 'home'),
+      awayPenaltyScore: this.resolvePenaltyScore(match, 'away'),
+    });
+    if (penaltyWinner !== undefined) return penaltyWinner;
+
     const winner = (match.winner ?? match.winner_team ?? '').trim();
     if (winner.length === 0) return undefined;
     if (winner === match.home_team) return 'home';
     if (winner === match.away_team) return 'away';
     return undefined;
+  }
+
+  private resolvePenaltyScore(match: Wc2026Match, team: 'home' | 'away'): number | undefined {
+    const directScore = team === 'home' ? match.home_pen : match.away_pen;
+    const camelScore = team === 'home' ? match.homePen : match.awayPen;
+    const namedScore =
+      team === 'home' ? match.homePenaltyScore : match.awayPenaltyScore;
+    const nestedScore = team === 'home'
+      ? match.penalties?.home
+      : match.penalties?.away;
+    return directScore ?? camelScore ?? namedScore ?? nestedScore;
+  }
+
+  private withDerivedKnockoutWinners(matches: WorldCupMatch[]): WorldCupMatch[] {
+    return matches.map((match) => {
+      const qualifiedPick =
+        match.qualifiedPick ??
+        this.qualifiedPickFromPenaltyScore(match) ??
+        this.inferQualifiedPickFromFutureMatches(match, matches);
+      return qualifiedPick === undefined ? match : { ...match, qualifiedPick };
+    });
+  }
+
+  private qualifiedPickFromPenaltyScore(
+    match: Pick<WorldCupMatch, 'homePenaltyScore' | 'awayPenaltyScore'>,
+  ): 'home' | 'away' | undefined {
+    if (
+      match.homePenaltyScore === undefined ||
+      match.awayPenaltyScore === undefined
+    ) {
+      return undefined;
+    }
+    if (match.homePenaltyScore > match.awayPenaltyScore) return 'home';
+    if (match.awayPenaltyScore > match.homePenaltyScore) return 'away';
+    return undefined;
+  }
+
+  private inferQualifiedPickFromFutureMatches(
+    match: WorldCupMatch,
+    matches: WorldCupMatch[],
+  ): 'home' | 'away' | undefined {
+    if (!this.shouldInferKnockoutWinner(match)) return undefined;
+
+    const kickoffTime = new Date(match.kickoffAt).getTime();
+    if (Number.isNaN(kickoffTime)) return undefined;
+    const laterMatches = matches.filter(
+      (item) => new Date(item.kickoffAt).getTime() > kickoffTime,
+    );
+    const homeTeamAppearsLater = this.teamAppearsInMatches(match.homeTeam, laterMatches);
+    const awayTeamAppearsLater = this.teamAppearsInMatches(match.awayTeam, laterMatches);
+
+    if (homeTeamAppearsLater === awayTeamAppearsLater) return undefined;
+    return homeTeamAppearsLater ? 'home' : 'away';
+  }
+
+  private shouldInferKnockoutWinner(match: WorldCupMatch): boolean {
+    if (match.homeScore === undefined || match.awayScore === undefined) return false;
+    if (match.homeScore !== match.awayScore) return false;
+    const normalizedStatus = match.status.trim().toUpperCase();
+    if (!['FT_PEN', 'PEN'].includes(normalizedStatus)) return false;
+    return this.isKnockoutRound(match.round);
+  }
+
+  private teamAppearsInMatches(team: string, matches: WorldCupMatch[]): boolean {
+    const normalizedTeam = this.normalizeTeamName(team);
+    if (normalizedTeam.length === 0) return false;
+    return matches.some(
+      (match) =>
+        this.normalizeTeamName(match.homeTeam) === normalizedTeam ||
+        this.normalizeTeamName(match.awayTeam) === normalizedTeam,
+    );
+  }
+
+  private isKnockoutRound(round: string): boolean {
+    const normalized = round.trim().toUpperCase().replace(/[\s-]+/g, '_');
+    return [
+      'R32',
+      'RD32',
+      'ROUND_OF_32',
+      'R16',
+      'RD16',
+      'ROUND_OF_16',
+      'QF',
+      'QUARTER',
+      'QUARTER_FINAL',
+      'QUARTER_FINALS',
+      'SF',
+      'SEMI',
+      'SEMI_FINAL',
+      'SEMI_FINALS',
+      'FINAL',
+      '3RD',
+    ].includes(normalized);
+  }
+
+  private normalizeTeamName(value: string): string {
+    return value
+      .trim()
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
   }
 }
 
@@ -377,12 +495,22 @@ interface Wc2026Match {
   phase?: string;
   home_score?: number;
   away_score?: number;
+  home_pen?: number;
+  away_pen?: number;
   homeScore?: number;
   awayScore?: number;
+  homePen?: number;
+  awayPen?: number;
+  homePenaltyScore?: number;
+  awayPenaltyScore?: number;
   qualifiedPick?: 'home' | 'away';
   winner?: string;
   winner_team?: string;
   score?: {
+    home?: number;
+    away?: number;
+  };
+  penalties?: {
     home?: number;
     away?: number;
   };

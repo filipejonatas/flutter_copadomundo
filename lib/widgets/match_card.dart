@@ -64,7 +64,13 @@ class MatchCard extends StatelessWidget {
     final homeScore = homeScoreOverride ?? match.homeScore;
     final awayScore = awayScoreOverride ?? match.awayScore;
     if (homeScore == null || awayScore == null) return 'VS';
-    return '$homeScore - $awayScore';
+    final baseScore = '$homeScore - $awayScore';
+    final homePenaltyScore = match.homePenaltyScore;
+    final awayPenaltyScore = match.awayPenaltyScore;
+    if (homePenaltyScore == null || awayPenaltyScore == null) {
+      return baseScore;
+    }
+    return '$baseScore\n($homePenaltyScore - $awayPenaltyScore)';
   }
 }
 
@@ -111,8 +117,9 @@ class _ScoreColumn extends StatelessWidget {
             textAlign: TextAlign.center,
             style: const TextStyle(
               color: AppColors.textPrimary,
-              fontSize: 28,
+              fontSize: 26,
               fontWeight: FontWeight.w900,
+              height: 1.05,
             ),
           ),
           const SizedBox(height: 8),
@@ -197,7 +204,7 @@ class MatchStatusChip extends StatelessWidget {
     final normalized = status.toUpperCase();
     final isLive =
         normalized == 'LIVE' || normalized == '1H' || normalized == '2H';
-    final isFinished = normalized == 'FT';
+    final isFinished = isFinishedMatchStatus(normalized);
     final color = isLive
         ? AppColors.liveBadge
         : isFinished
@@ -206,7 +213,7 @@ class MatchStatusChip extends StatelessWidget {
     final label = isLive
         ? 'Live'
         : isFinished
-        ? 'FT'
+        ? (normalized == 'FT_PEN' ? 'PEN' : 'FT')
         : status == 'NS'
         ? 'Today'
         : status;
