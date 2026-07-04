@@ -4,6 +4,7 @@ import { PlayoffsService } from './playoffs.service';
 import { PlayoffSeedSource } from './playoffs.types';
 import { UserMatchPrediction } from '../predictions/predictions.service';
 import { WorldCupMatch } from '../matches/world-cup-match';
+import { MatchesService } from '../matches/matches.service';
 
 function prediction(
   homeScore: number,
@@ -76,6 +77,47 @@ test('calculatePredictionPoints accepts qualifiedPick for tied knockout guesses'
 
   assert.equal(
     PlayoffsService.calculatePredictionPoints(tiedPrediction, penaltyMatch),
+    10,
+  );
+});
+
+test('withInferredQualifiedPicks derives tied knockout winner from next round', () => {
+  const matches = MatchesService.withInferredQualifiedPicks([
+    {
+      fixtureId: 78,
+      round: 'R32',
+      kickoffLabel: '03 jul, 15:00',
+      kickoffAt: '2026-07-03T18:00:00Z',
+      homeTeam: 'Australia',
+      awayTeam: 'Egypt',
+      status: 'FT',
+      homeScore: 1,
+      awayScore: 1,
+    },
+    {
+      fixtureId: 103,
+      round: 'R16',
+      kickoffLabel: '07 jul, 13:00',
+      kickoffAt: '2026-07-07T16:00:00Z',
+      homeTeam: 'Argentina',
+      awayTeam: 'Egypt',
+      status: 'PRE',
+    },
+  ]);
+  const australiaEgypt = matches.find((match) => match.fixtureId === 78);
+
+  assert.equal(australiaEgypt?.qualifiedPick, 'away');
+  assert.equal(
+    PlayoffsService.calculatePredictionPoints(
+      {
+        fixtureId: 78,
+        pick: 'draw',
+        qualifiedPick: 'away',
+        homeScore: 1,
+        awayScore: 1,
+      },
+      australiaEgypt as WorldCupMatch,
+    ),
     10,
   );
 });

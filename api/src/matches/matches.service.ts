@@ -190,26 +190,42 @@ export class MatchesService {
   }
 
   private toWorldCupMatches(payload: Wc2026MatchesResponse): WorldCupMatch[] {
-    return this.sortByKickoff(
-      payload.map((m) => {
-        if (this.isWorldCupMatch(m)) return m;
+    const matches = payload.map((m) => {
+      if (this.isWorldCupMatch(m)) return m;
 
-        const kickoff = m.kickoff_utc ?? m.kickoff ?? new Date().toISOString();
-        const qualifiedPick = this.resolveQualifiedPick(m);
-        return {
-          fixtureId: m.id ?? m.match_number ?? 0,
-          round: (m.round ?? '') + (m.group_name ? ` - ${m.group_name}` : ''),
-          kickoffLabel: this.formatKickoffLabel(kickoff),
-          kickoffAt: kickoff,
-          homeTeam: m.home_team ?? '',
-          awayTeam: m.away_team ?? '',
-          status: m.phase ?? m.status ?? '',
-          homeScore: this.resolveScore(m, 'home'),
-          awayScore: this.resolveScore(m, 'away'),
-          ...(qualifiedPick === undefined ? {} : { qualifiedPick }),
-        };
-      }),
-    );
+      const kickoff = m.kickoff_utc ?? m.kickoff ?? new Date().toISOString();
+      const qualifiedPick = this.resolveQualifiedPick(m);
+      return {
+        fixtureId: m.id ?? m.match_number ?? 0,
+        round: (m.round ?? '') + (m.group_name ? ` - ${m.group_name}` : ''),
+        kickoffLabel: this.formatKickoffLabel(kickoff),
+        kickoffAt: kickoff,
+        homeTeam: m.home_team ?? '',
+        awayTeam: m.away_team ?? '',
+        status: m.phase ?? m.status ?? '',
+        homeScore: this.resolveScore(m, 'home'),
+        awayScore: this.resolveScore(m, 'away'),
+        ...(qualifiedPick === undefined ? {} : { qualifiedPick }),
+      };
+    });
+    return this.sortByKickoff(MatchesService.withInferredQualifiedPicks(matches));
+  }
+
+  static withInferredQualifiedPicks(matches: WorldCupMatch[]): WorldCupMatch[] {
+    return matches.map((match) => {
+      if (
+        match.qualifiedPick !== undefined ||
+        match.homeScore === undefined ||
+        match.awayScore === undefined ||
+        match.homeScore !== match.awayScore ||
+        !MatchesService.isKnockoutRound(match.round)
+      ) {
+        return match;
+      }
+
+      const qualifiedPick = MatchesService.inferQualifiedPick(match, matches);
+      return qualifiedPick === undefined ? match : { ...match, qualifiedPick };
+    });
   }
 
   private async savePersistentMatchesCache(matches: WorldCupMatch[]): Promise<void> {
@@ -256,7 +272,7 @@ export class MatchesService {
     const matches = value.matches.filter((item): item is WorldCupMatch =>
       this.isWorldCupMatch(item),
     );
-    return this.sortByKickoff(matches);
+    return this.sortByKickoff(MatchesService.withInferredQualifiedPicks(matches));
   }
 
   private getMockWorldCup2026Matches(): WorldCupMatch[] {
@@ -383,9 +399,88 @@ export class MatchesService {
 
     const winner = (match.winner ?? match.winner_team ?? '').trim();
     if (winner.length === 0) return undefined;
-    if (winner === match.home_team) return 'home';
-    if (winner === match.away_team) return 'away';
+    if (this.normalizedTeamName(winner) === this.normalizedTeamName(match.home_team ?? '')) {
+      return 'home';
+    }
+    if (this.normalizedTeamName(winner) === this.normalizedTeamName(match.away_team ?? '')) {
+      return 'away';
+    }
     return undefined;
+  }
+
+  private normalizedTeamName(value: string): string {
+    return MatchesService.normalizedStaticTeamName(value);
+  }
+
+  private static inferQualifiedPick(
+    match: WorldCupMatch,
+    matches: WorldCupMatch[],
+  ): 'home' | 'away' | undefined {
+    const currentRoundRank = MatchesService.knockoutRoundRank(match.round);
+    if (currentRoundRank === undefined) return undefined;
+
+    const kickoffAt = new Date(match.kickoffAt).getTime();
+    const laterKnockoutMatches = matches.filter((candidate) => {
+      const candidateRoundRank = MatchesService.knockoutRoundRank(candidate.round);
+      if (
+        candidateRoundRank === undefined ||
+        candidateRoundRank <= currentRoundRank
+      ) {
+        return false;
+      }
+
+      const candidateKickoffAt = new Date(candidate.kickoffAt).getTime();
+      return Number.isNaN(kickoffAt) || candidateKickoffAt > kickoffAt;
+    });
+
+    const homeTeam = MatchesService.normalizedStaticTeamName(match.homeTeam);
+    const awayTeam = MatchesService.normalizedStaticTeamName(match.awayTeam);
+    const homeAppears = laterKnockoutMatches.some((candidate) =>
+      MatchesService.matchContainsTeam(candidate, homeTeam),
+    );
+    const awayAppears = laterKnockoutMatches.some((candidate) =>
+      MatchesService.matchContainsTeam(candidate, awayTeam),
+    );
+
+    if (homeAppears === awayAppears) return undefined;
+    return homeAppears ? 'home' : 'away';
+  }
+
+  private static matchContainsTeam(match: WorldCupMatch, team: string): boolean {
+    return (
+      MatchesService.normalizedStaticTeamName(match.homeTeam) === team ||
+      MatchesService.normalizedStaticTeamName(match.awayTeam) === team
+    );
+  }
+
+  private static isKnockoutRound(round: string): boolean {
+    return MatchesService.knockoutRoundRank(round) !== undefined;
+  }
+
+  private static knockoutRoundRank(round: string): number | undefined {
+    const normalized = round.trim().toUpperCase().replace(/[\s-]+/g, '_');
+    if (['RD32', 'R32', 'ROUND_OF_32', '1/16', '16_AVOS'].includes(normalized)) {
+      return 1;
+    }
+    if (['RD16', 'R16', 'ROUND_OF_16', '1/8', 'OITAVAS'].includes(normalized)) {
+      return 2;
+    }
+    if (['QF', 'QUARTER', 'QUARTER_FINAL', 'QUARTER_FINALS', 'QUARTAS'].includes(normalized)) {
+      return 3;
+    }
+    if (['SF', 'SEMI', 'SEMI_FINAL', 'SEMI_FINALS', 'SEMIS'].includes(normalized)) {
+      return 4;
+    }
+    if (['F', 'FINAL'].includes(normalized)) return 5;
+    return undefined;
+  }
+
+  private static normalizedStaticTeamName(value: string): string {
+    return value
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .trim()
+      .toLowerCase();
   }
 }
 
