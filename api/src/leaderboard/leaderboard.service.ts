@@ -16,6 +16,25 @@ export interface LeaderboardEntry {
   exactScores: number;
 }
 
+export interface RecalculateLeaderboardResult {
+  snapshotId?: string;
+  matchesCount: number;
+  finishedMatchesCount: number;
+  entriesCount: number;
+  top: LeaderboardEntry[];
+  deltas: LeaderboardScoreDelta[];
+}
+
+export interface LeaderboardScoreDelta {
+  userId: string;
+  nick: string;
+  previousPoints: number;
+  points: number;
+  delta: number;
+  previousPredictionsCount: number;
+  predictionsCount: number;
+}
+
 interface ConsolidatedScore {
   points: number;
   predictionsCount: number;
@@ -33,12 +52,55 @@ export class LeaderboardService {
   ) {}
 
   async loadLeaderboard(): Promise<LeaderboardEntry[]> {
-    const matches = await this.matchesService.getWorldCup2026Matches();
+    const [scoresSnapshot, usersSnapshot] = await Promise.all([
+      this.firebaseAdmin.database.ref('scores').get(),
+      this.firebaseAdmin.database.ref('users').get(),
+    ]);
+    const scores = this.asRecord(scoresSnapshot.val());
+    const users = this.asRecord(usersSnapshot.val());
+    return this.toLeaderboardEntries(scores, users);
+  }
+
+  async recalculateLeaderboard(): Promise<RecalculateLeaderboardResult> {
+    const previousScoresSnapshot = await this.firebaseAdmin.database
+      .ref('scores')
+      .get();
+    const previousScores = this.asRecord(previousScoresSnapshot.val());
+    const matches = await this.matchesService.refreshWorldCup2026Matches();
     const finishedMatches = Object.fromEntries(
       matches
         .filter((match) => this.isFinished(match))
         .map((match) => [String(match.fixtureId), match]),
     );
+    const calculatedScores = await this.calculateScores(finishedMatches);
+    const entries = this.toLeaderboardEntries(calculatedScores);
+    const snapshotId = await this.persistScoreSnapshot(previousScores);
+
+    await this.firebaseAdmin.database.ref('scores').set(
+      Object.fromEntries(
+        Object.entries(calculatedScores).map(([userId, score]) => [
+          userId,
+          {
+            ...score,
+            updatedAt: ServerValue.TIMESTAMP,
+          },
+        ]),
+      ),
+    );
+
+    return {
+      ...(snapshotId === undefined ? {} : { snapshotId }),
+      matchesCount: matches.length,
+      finishedMatchesCount: Object.keys(finishedMatches).length,
+      entriesCount: entries.length,
+      top: entries.slice(0, 10),
+      deltas: this.scoreDeltas(previousScores, calculatedScores),
+    };
+  }
+
+  private async calculateScores(
+    finishedMatches: Record<string, WorldCupMatch>,
+  ): Promise<Record<string, Record<string, unknown>>> {
     const [usersSnapshot, predictionsSnapshot] = await Promise.all([
       this.firebaseAdmin.database.ref('users').get(),
       this.firebaseAdmin.database.ref('predictions').get(),
@@ -46,7 +108,7 @@ export class LeaderboardService {
     const users = this.asRecord(usersSnapshot.val());
     const predictions = this.asRecord(predictionsSnapshot.val());
     const userIds = new Set([...Object.keys(users), ...Object.keys(predictions)]);
-    const entries: LeaderboardEntry[] = [];
+    const scores: Record<string, Record<string, unknown>> = {};
 
     for (const userId of userIds) {
       const profile = this.asRecord(users[userId]);
@@ -56,19 +118,51 @@ export class LeaderboardService {
       const avatarId = this.stringValue(profile.avatarId) ?? 'star';
       const photoUrl = this.stringValue(profile.photoUrl);
 
-      await this.persistScore(userId, nick, avatarId, photoUrl, score);
-
-      entries.push({
-        position: 0,
+      scores[userId] = {
         userId,
         nick,
         avatarId,
-        photoUrl,
+        ...(photoUrl === undefined ? {} : { photoUrl }),
         points: score.points,
         predictionsCount: score.predictionsCount,
+        hits: score.hits,
         exactScores: score.exactScores,
-      });
+        matches: score.matches,
+      };
     }
+
+    return scores;
+  }
+
+  private toLeaderboardEntries(
+    scores: Record<string, unknown>,
+    users: Record<string, unknown> = {},
+  ): LeaderboardEntry[] {
+    const entries = Object.entries(scores)
+      .map(([userIdFromKey, value]) => {
+        const score = this.asRecord(value);
+        const userId = this.stringValue(score.userId) ?? userIdFromKey;
+        const profile = this.asRecord(users[userId]);
+        return {
+          position: 0,
+          userId,
+          nick:
+            this.stringValue(profile.nick) ??
+            this.stringValue(score.nick) ??
+            'Palpiteiro',
+          avatarId:
+            this.stringValue(profile.avatarId) ??
+            this.stringValue(score.avatarId) ??
+            'star',
+          photoUrl:
+            this.stringValue(profile.photoUrl) ??
+            this.stringValue(score.photoUrl),
+          points: this.numberValue(score.points),
+          predictionsCount: this.numberValue(score.predictionsCount),
+          exactScores: this.numberValue(score.exactScores),
+        };
+      })
+      .filter((entry) => entry.userId.length > 0);
 
     entries.sort((a, b) => {
       if (b.points !== a.points) return b.points - a.points;
@@ -144,25 +238,64 @@ export class LeaderboardService {
     );
   }
 
-  private persistScore(
-    userId: string,
-    nick: string,
-    avatarId: string,
-    photoUrl: string | undefined,
-    score: ConsolidatedScore,
-  ) {
-    return this.firebaseAdmin.database.ref(`scores/${userId}`).set({
-      userId,
-      nick,
-      avatarId,
-      ...(photoUrl === undefined ? {} : { photoUrl }),
-      points: score.points,
-      predictionsCount: score.predictionsCount,
-      hits: score.hits,
-      exactScores: score.exactScores,
-      matches: score.matches,
-      updatedAt: ServerValue.TIMESTAMP,
+  private async persistScoreSnapshot(
+    previousScores: Record<string, unknown>,
+  ): Promise<string | undefined> {
+    if (Object.keys(previousScores).length === 0) return undefined;
+
+    const snapshotId = String(Date.now());
+    await this.firebaseAdmin.database.ref(`scoreSnapshots/${snapshotId}`).set({
+      createdAt: ServerValue.TIMESTAMP,
+      reason: 'leaderboard-recalculate',
+      scores: previousScores,
     });
+    return snapshotId;
+  }
+
+  private scoreDeltas(
+    previousScores: Record<string, unknown>,
+    calculatedScores: Record<string, Record<string, unknown>>,
+  ): LeaderboardScoreDelta[] {
+    const userIds = new Set([
+      ...Object.keys(previousScores),
+      ...Object.keys(calculatedScores),
+    ]);
+
+    return [...userIds]
+      .map((userId) => {
+        const previous = this.asRecord(previousScores[userId]);
+        const current = this.asRecord(calculatedScores[userId]);
+        const nick =
+          this.stringValue(current.nick) ??
+          this.stringValue(previous.nick) ??
+          'Palpiteiro';
+        const previousPoints = this.numberValue(previous.points);
+        const points = this.numberValue(current.points);
+        const previousPredictionsCount = this.numberValue(
+          previous.predictionsCount,
+        );
+        const predictionsCount = this.numberValue(current.predictionsCount);
+
+        return {
+          userId,
+          nick,
+          previousPoints,
+          points,
+          delta: points - previousPoints,
+          previousPredictionsCount,
+          predictionsCount,
+        };
+      })
+      .filter(
+        (delta) =>
+          delta.delta !== 0 ||
+          delta.previousPredictionsCount !== delta.predictionsCount,
+      )
+      .sort((a, b) => {
+        const absDiff = Math.abs(b.delta) - Math.abs(a.delta);
+        if (absDiff !== 0) return absDiff;
+        return a.nick.toLowerCase().localeCompare(b.nick.toLowerCase());
+      });
   }
 
   private asRecord(value: unknown): Record<string, unknown> {
@@ -186,5 +319,9 @@ export class LeaderboardService {
     if (typeof value !== 'string') return undefined;
     const trimmed = value.trim();
     return trimmed.length > 0 ? trimmed : undefined;
+  }
+
+  private numberValue(value: unknown): number {
+    return typeof value === 'number' && Number.isFinite(value) ? value : 0;
   }
 }

@@ -10,7 +10,9 @@
     "start:dev": "nest start --watch",
     "build": "nest build",
     "lint": "tsc --noEmit",
-    "test:playoff": "npm run build && node --test dist/playoffs/playoffs.service.spec.js"
+    "test:playoff": "npm run build && node --test dist/playoffs/playoffs.service.spec.js",
+    "advance:playoff": "node ../scripts/advance-playoff-round.cjs",
+    "recalculate:leaderboard": "node ../scripts/recalculate-leaderboard.cjs"
   },
   "dependencies": {
     "@nestjs/common": "^11.1.6",

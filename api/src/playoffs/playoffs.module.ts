@@ -10,6 +10,6 @@ import { PlayoffsService } from './playoffs.service';
   imports: [LeaderboardModule, MatchesModule],
   controllers: [PlayoffsController],
   providers: [AuthService, FirebaseAdminService, PlayoffsService],
+  exports: [PlayoffsService],
 })
 export class PlayoffsModule {}
-

@@ -1,4 +1,4 @@
-import { Controller, Get, Headers } from '@nestjs/common';
+import { Controller, Get, Headers, Post } from '@nestjs/common';
 import { AuthService } from '../auth/auth.service';
 import { LeaderboardService } from './leaderboard.service';
 
@@ -17,5 +17,13 @@ export class LeaderboardController {
     await this.authService.verifyAppCheckHeader(appCheckToken);
     await this.authService.verifyAuthorizationHeader(authorization);
     return this.leaderboardService.loadLeaderboard();
+  }
+
+  @Post('recalculate')
+  async recalculateLeaderboard(
+    @Headers('x-playoff-admin-secret') adminSecret?: string,
+  ) {
+    this.authService.verifyAdminSecretHeader(adminSecret);
+    return this.leaderboardService.recalculateLeaderboard();
   }
 }

@@ -22,6 +22,11 @@ export interface GeneratePlayoffBody {
   deadlineAt?: unknown;
 }
 
+export interface AdvancePlayoffRoundBody {
+  round?: unknown;
+  force?: unknown;
+}
+
 @Injectable()
 export class PlayoffsService {
   static readonly maxParticipants = 32;
@@ -58,6 +63,98 @@ export class PlayoffsService {
     });
 
     return bracket;
+  }
+
+  async advanceCurrentRound(
+    body: AdvancePlayoffRoundBody = {},
+  ): Promise<PlayoffBracket> {
+    if (!this.isPlayoffActive()) {
+      throw new Error('Mata-mata ainda nao esta ativo.');
+    }
+
+    const round = this.roundKey(this.stringValue(body.round) ?? 'round_of_32');
+    const force = body.force === true;
+    const bracket = await this.getCurrentBracket();
+    if (!bracket) {
+      throw new Error('Chave oficial nao encontrada.');
+    }
+
+    const matches = this.withSortedMatches(bracket.matches);
+    const roundMatches = matches.filter((match) => this.roundKey(match.round) === round);
+    if (roundMatches.length === 0) {
+      throw new Error(`Rodada ${round} nao encontrada na chave.`);
+    }
+
+    if (!force) {
+      await this.assertRoundFinished(round);
+    }
+
+    const scores = await this.calculateRoundScore(round);
+    const scoresByUserId = new Map(
+      scores.map((score) => [score.userId, { points: score.points }]),
+    );
+    const participantByUserId = new Map(
+      bracket.participants.map((participant) => [participant.userId, participant]),
+    );
+    const winnerByMatchId = new Map<string, PlayoffParticipant>();
+
+    for (const match of roundMatches) {
+      const winner = PlayoffsService.resolveMatchWinner(match, scoresByUserId);
+      if (!winner) continue;
+
+      match.winnerParticipantId = winner.userId;
+      match.status = 'finished';
+      match.isBye = match.participantA === undefined || match.participantB === undefined;
+      winnerByMatchId.set(match.id, winner);
+    }
+
+    const nextRoundIndex = Math.min(
+      ...roundMatches.map((match) => match.roundIndex),
+    ) + 1;
+    const nextRoundMatches = matches.filter(
+      (match) => match.roundIndex === nextRoundIndex,
+    );
+
+    for (const match of nextRoundMatches) {
+      const participantA = this.participantFromSource(
+        match.sourceMatchAId,
+        winnerByMatchId,
+        matches,
+        participantByUserId,
+      );
+      const participantB = this.participantFromSource(
+        match.sourceMatchBId,
+        winnerByMatchId,
+        matches,
+        participantByUserId,
+      );
+
+      if (participantA !== undefined) match.participantA = participantA;
+      if (participantB !== undefined) match.participantB = participantB;
+
+      const automaticWinner = this.automaticWinner(match);
+      if (automaticWinner !== undefined) {
+        match.winnerParticipantId = automaticWinner.userId;
+        match.isBye = true;
+        match.status = 'finished';
+      } else if (match.participantA !== undefined || match.participantB !== undefined) {
+        delete match.winnerParticipantId;
+        match.isBye = false;
+        match.status = 'pending';
+      }
+    }
+
+    const advancedBracket: PlayoffBracket = {
+      ...bracket,
+      matches,
+    };
+
+    await this.firebaseAdmin.database.ref('playoffs/current').set({
+      ...advancedBracket,
+      updatedAt: ServerValue.TIMESTAMP,
+    });
+
+    return advancedBracket;
   }
 
   async calculateRoundScore(round: string): Promise<PlayoffRoundScore[]> {
@@ -133,6 +230,47 @@ export class PlayoffsService {
       startsAt: this.playoffStartAt().toISOString(),
       serverNow: now.toISOString(),
     };
+  }
+
+  getCurrentPendingRound(bracket: PlayoffBracket | null): string | undefined {
+    if (!bracket) return undefined;
+
+    const sortedMatches = this.withSortedMatches(bracket.matches);
+    const roundIndexes = [
+      ...new Set(sortedMatches.map((match) => match.roundIndex)),
+    ].sort((a, b) => a - b);
+
+    for (const roundIndex of roundIndexes) {
+      const roundMatches = sortedMatches.filter(
+        (match) => match.roundIndex === roundIndex,
+      );
+      if (
+        roundMatches.some(
+          (match) =>
+            (match.participantA !== undefined || match.participantB !== undefined) &&
+            match.status !== 'finished',
+        )
+      ) {
+        return roundMatches[0]?.round;
+      }
+    }
+
+    return undefined;
+  }
+
+  isRoundCompleteWithMatches(
+    round: string | undefined,
+    matches: WorldCupMatch[],
+  ): boolean {
+    if (!round) return false;
+
+    const playoffRoundMatches = matches.filter(
+      (match) => this.sameRound(match.round, round) && this.isPlayoffMatch(match),
+    );
+    return (
+      playoffRoundMatches.length > 0 &&
+      playoffRoundMatches.every((match) => this.isFinished(match))
+    );
   }
 
   static generateBracket(
@@ -262,6 +400,67 @@ export class PlayoffsService {
     return match.participantA.seed < match.participantB.seed
       ? match.participantA
       : match.participantB;
+  }
+
+  private async assertRoundFinished(round: string): Promise<void> {
+    const matches = await this.matchesService.getWorldCup2026Matches();
+    const playoffRoundMatches = matches.filter(
+      (match) => this.sameRound(match.round, round) && this.isPlayoffMatch(match),
+    );
+
+    if (playoffRoundMatches.length === 0) {
+      throw new Error(`Nenhum jogo da Copa encontrado para ${round}.`);
+    }
+
+    const unfinishedMatches = playoffRoundMatches.filter(
+      (match) => !this.isFinished(match),
+    );
+    if (unfinishedMatches.length > 0) {
+      throw new Error(
+        `Rodada ${round} ainda tem ${unfinishedMatches.length} jogo(s) nao finalizado(s).`,
+      );
+    }
+  }
+
+  private withSortedMatches(matches: PlayoffMatch[]): PlayoffMatch[] {
+    return matches
+      .map((match) => ({
+        ...match,
+        ...(match.participantA === undefined
+          ? {}
+          : { participantA: { ...match.participantA } }),
+        ...(match.participantB === undefined
+          ? {}
+          : { participantB: { ...match.participantB } }),
+      }))
+      .sort((a, b) => {
+        if (a.roundIndex !== b.roundIndex) return a.roundIndex - b.roundIndex;
+        return a.position - b.position;
+      });
+  }
+
+  private participantFromSource(
+    sourceMatchId: string | undefined,
+    winnerByMatchId: Map<string, PlayoffParticipant>,
+    matches: PlayoffMatch[],
+    participantByUserId: Map<string, PlayoffParticipant>,
+  ): PlayoffParticipant | undefined {
+    if (!sourceMatchId) return undefined;
+
+    const freshWinner = winnerByMatchId.get(sourceMatchId);
+    if (freshWinner !== undefined) return freshWinner;
+
+    const sourceMatch = matches.find((match) => match.id === sourceMatchId);
+    if (!sourceMatch?.winnerParticipantId) return undefined;
+    return participantByUserId.get(sourceMatch.winnerParticipantId);
+  }
+
+  private automaticWinner(
+    match: Pick<PlayoffMatch, 'participantA' | 'participantB'>,
+  ): PlayoffParticipant | undefined {
+    if (match.participantA && !match.participantB) return match.participantA;
+    if (match.participantB && !match.participantA) return match.participantB;
+    return undefined;
   }
 
   private calculateUserRoundScore(

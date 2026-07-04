@@ -51,6 +51,15 @@ export class AuthService {
     }
   }
 
+  verifyAdminSecretHeader(secret?: string): void {
+    const configuredSecret = this.configService
+      .get<string>('PLAYOFF_ADMIN_SECRET')
+      ?.trim();
+    if (!configuredSecret || secret !== configuredSecret) {
+      throw new UnauthorizedException('Segredo administrativo invalido.');
+    }
+  }
+
   private shouldRequireAppCheck(): boolean {
     const configuredValue = this.configService.get<string>('FIREBASE_APP_CHECK_REQUIRED');
     if (configuredValue) {

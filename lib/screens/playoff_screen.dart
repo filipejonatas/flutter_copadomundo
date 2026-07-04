@@ -37,6 +37,7 @@ class _PlayoffScreenState extends State<PlayoffScreen> {
 
   List<LeaderboardEntry> _entries = [];
   PlayoffBracket? _bracket;
+  Map<String, Map<String, PlayoffRoundScore>> _roundScoresByRound = {};
   bool _isLoading = true;
 
   @override
@@ -49,7 +50,12 @@ class _PlayoffScreenState extends State<PlayoffScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final participants = _participants;
-    final bracket = _PreviewBracket(participants: participants);
+    final bracket = _bracket == null
+        ? _PreviewBracket(participants: participants)
+        : _OfficialBracket(
+            bracket: _bracket!,
+            roundScoresByRound: _roundScoresByRound,
+          );
 
     return Scaffold(
       appBar: AppBar(
@@ -142,8 +148,11 @@ class _PlayoffScreenState extends State<PlayoffScreen> {
         final bracket = await _playoffService.loadCurrentBracket();
         if (!mounted) return;
         if (bracket != null) {
+          final roundScoresByRound = await _loadRoundScores(bracket);
+          if (!mounted) return;
           setState(() {
             _bracket = bracket;
+            _roundScoresByRound = roundScoresByRound;
             _entries = bracket.participants
                 .map(
                   (participant) => participant.toLeaderboardEntry(
@@ -188,6 +197,25 @@ class _PlayoffScreenState extends State<PlayoffScreen> {
         isCurrentUser: true,
       ),
     ];
+  }
+
+  Future<Map<String, Map<String, PlayoffRoundScore>>> _loadRoundScores(
+    PlayoffBracket bracket,
+  ) async {
+    final rounds = bracket.matches.map((match) => match.round).toSet();
+    final entries = await Future.wait(
+      rounds.map((round) async {
+        try {
+          final scores = await _playoffService.loadRoundScore(round);
+          return MapEntry(round, {
+            for (final score in scores) score.userId: score,
+          });
+        } catch (_) {
+          return MapEntry(round, <String, PlayoffRoundScore>{});
+        }
+      }),
+    );
+    return Map.fromEntries(entries);
   }
 }
 
@@ -443,6 +471,7 @@ class _BracketParticipant {
     required this.seed,
     required this.nick,
     required this.score,
+    this.userId = '',
     this.isBye = false,
   });
 
@@ -458,6 +487,7 @@ class _BracketParticipant {
   final int seed;
   final String nick;
   final int score;
+  final String userId;
   final bool isBye;
 }
 
@@ -466,16 +496,18 @@ class _PlayerSlot extends StatelessWidget {
     required this.participant,
     this.alignRight = false,
     this.isAdvanced = false,
+    this.width = 214,
   });
 
   final _BracketParticipant participant;
   final bool alignRight;
   final bool isAdvanced;
+  final double width;
 
   @override
   Widget build(BuildContext context) {
     final background = participant.isBye
-        ? AppColors.background.withValues(alpha: .65)
+        ? AppColors.background
         : isAdvanced
         ? AppColors.primaryAccent
         : AppColors.surfaceElevated;
@@ -483,31 +515,23 @@ class _PlayerSlot extends StatelessWidget {
     final secondary = isAdvanced ? Colors.black87 : AppColors.textSecondary;
 
     return Container(
-      width: 214,
+      width: width,
       height: 34,
       padding: const EdgeInsets.symmetric(horizontal: 10),
       decoration: BoxDecoration(
         color: background,
-        borderRadius: BorderRadius.circular(AppRadii.pill),
+        borderRadius: BorderRadius.circular(8),
         border: Border.all(
           color: participant.isBye
-              ? Colors.white.withValues(alpha: .07)
-              : AppColors.primaryAccent.withValues(alpha: isAdvanced ? .9 : .34),
+              ? Colors.white.withValues(alpha: .08)
+              : AppColors.primaryAccent.withValues(alpha: isAdvanced ? .9 : .5),
         ),
-        boxShadow: isAdvanced
-            ? [
-                BoxShadow(
-                  color: AppColors.primaryAccent.withValues(alpha: .24),
-                  blurRadius: 18,
-                ),
-              ]
-            : null,
       ),
       child: Row(
         textDirection: alignRight ? TextDirection.rtl : TextDirection.ltr,
         children: [
           Text(
-            '#${participant.seed}',
+            participant.seed <= 0 ? '--' : '#${participant.seed}',
             style: TextStyle(
               color: secondary,
               fontSize: 11,
@@ -542,6 +566,337 @@ class _PlayerSlot extends StatelessWidget {
     );
   }
 }
+
+class _OfficialBracket extends StatefulWidget {
+  const _OfficialBracket({
+    required this.bracket,
+    required this.roundScoresByRound,
+  });
+
+  final PlayoffBracket bracket;
+  final Map<String, Map<String, PlayoffRoundScore>> roundScoresByRound;
+
+  @override
+  State<_OfficialBracket> createState() => _OfficialBracketState();
+}
+
+class _OfficialBracketState extends State<_OfficialBracket> {
+  final ScrollController _scrollController = ScrollController();
+  bool _didCenterBracket = false;
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_didCenterBracket && _scrollController.hasClients) {
+        final maxExtent = _scrollController.position.maxScrollExtent;
+        if (maxExtent > 0) {
+          _scrollController.jumpTo(maxExtent / 2);
+        }
+        _didCenterBracket = true;
+      }
+    });
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final viewportContentWidth = constraints.maxWidth - 28;
+        final bracketViewportWidth =
+            viewportContentWidth > 1120 ? viewportContentWidth : 1120.0;
+
+        return ClipRRect(
+          borderRadius: BorderRadius.circular(AppRadii.card),
+          child: Container(
+            color: AppColors.surface,
+            child: SingleChildScrollView(
+              controller: _scrollController,
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.all(14),
+              child: SizedBox(
+                width: bracketViewportWidth,
+                height: 690,
+                child: Center(
+                  child: SizedBox(
+                    width: 1120,
+                    height: 690,
+                    child: Stack(
+                      children: [
+                        Positioned.fill(
+                          child: CustomPaint(
+                            painter: _BracketLinesPainter(),
+                          ),
+                        ),
+                        Positioned(
+                          top: 22,
+                          left: 428,
+                          right: 428,
+                          child: _CenterBadge(
+                            participantsCount: widget.bracket.participants.length,
+                          ),
+                        ),
+                        ..._officialSlots(),
+                        const Positioned(
+                          left: 514,
+                          top: 330,
+                          child: _FinalSlot(),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  List<Widget> _officialSlots() {
+    final slots = <Widget>[];
+    final matchesByRoundIndex = <int, List<PlayoffMatch>>{};
+    for (final match in widget.bracket.matches) {
+      matchesByRoundIndex.putIfAbsent(match.roundIndex, () => []).add(match);
+    }
+    for (final matches in matchesByRoundIndex.values) {
+      matches.sort((a, b) => a.position.compareTo(b.position));
+    }
+
+    slots.addAll(_firstRoundSlots(matchesByRoundIndex[0] ?? []));
+    slots.addAll(_advancedRoundSlots(matchesByRoundIndex[1] ?? [], 1));
+    slots.addAll(_advancedRoundSlots(matchesByRoundIndex[2] ?? [], 2));
+    slots.addAll(_advancedRoundSlots(matchesByRoundIndex[3] ?? [], 3));
+    slots.addAll(_advancedRoundSlots(matchesByRoundIndex[4] ?? [], 4));
+    return slots;
+  }
+
+  List<Widget> _firstRoundSlots(List<PlayoffMatch> matches) {
+    const slotHeight = 34.0;
+    const rowGap = 8.0;
+    const top = 18.0;
+    final slots = <Widget>[];
+
+    for (final match in matches) {
+      final localMatchIndex = match.position <= 8
+          ? match.position - 1
+          : match.position - 9;
+      final participantRows = [
+        _participantSlot(match.participantA, match),
+        _participantSlot(match.participantB, match),
+      ];
+
+      for (var row = 0; row < participantRows.length; row++) {
+        final participant = participantRows[row];
+        if (participant == null) continue;
+
+        final topOffset =
+            top + (localMatchIndex * 2 + row) * (slotHeight + rowGap);
+        final alignRight = match.position > 8;
+        slots.add(
+          Positioned(
+            left: alignRight ? null : 10,
+            right: alignRight ? 10 : null,
+            top: topOffset,
+            child: _PlayerSlot(
+              participant: participant,
+              alignRight: alignRight,
+              isAdvanced: participant.userId == match.winnerParticipantId,
+            ),
+          ),
+        );
+      }
+    }
+
+    return slots;
+  }
+
+  List<Widget> _advancedRoundSlots(List<PlayoffMatch> matches, int roundIndex) {
+    if (matches.isEmpty) return [];
+    if (roundIndex == 4) {
+      return _finalRoundSlots(matches.first);
+    }
+
+    final split = matches.length / 2;
+    final leftMatches = matches
+        .where((match) => match.position <= split)
+        .toList();
+    final rightMatches = matches
+        .where((match) => match.position > split)
+        .toList();
+    final specs = _roundSpecs[roundIndex]!;
+    final slots = <Widget>[];
+
+    for (var index = 0; index < leftMatches.length; index++) {
+      slots.addAll(
+        _matchSlots(
+          match: leftMatches[index],
+          left: specs.leftX,
+          top: specs.leftTops[index],
+          compact: roundIndex >= 3,
+        ),
+      );
+    }
+
+    for (var index = 0; index < rightMatches.length; index++) {
+      slots.addAll(
+        _matchSlots(
+          match: rightMatches[index],
+          right: specs.rightX,
+          top: specs.rightTops[index],
+          alignRight: true,
+          compact: roundIndex >= 3,
+        ),
+      );
+    }
+
+    return slots;
+  }
+
+  List<Widget> _finalRoundSlots(PlayoffMatch match) {
+    final participants = [
+      _participantSlot(match.participantA, match),
+      _participantSlot(match.participantB, match),
+    ];
+    final leftParticipant = participants[0];
+    final rightParticipant = participants[1];
+    final slots = <Widget>[];
+
+    if (leftParticipant != null) {
+      slots.add(
+        Positioned(
+          left: 360,
+          top: 330,
+          child: _PlayerSlot(
+            participant: leftParticipant,
+            isAdvanced: leftParticipant.userId == match.winnerParticipantId,
+            width: 144,
+          ),
+        ),
+      );
+    }
+    if (rightParticipant != null) {
+      slots.add(
+        Positioned(
+          right: 360,
+          top: 330,
+          child: _PlayerSlot(
+            participant: rightParticipant,
+            alignRight: true,
+            isAdvanced: rightParticipant.userId == match.winnerParticipantId,
+            width: 144,
+          ),
+        ),
+      );
+    }
+
+    return slots;
+  }
+
+  List<Widget> _matchSlots({
+    required PlayoffMatch match,
+    required double top,
+    double? left,
+    double? right,
+    bool alignRight = false,
+    bool compact = false,
+  }) {
+    final slotGap = compact ? 4.0 : 6.0;
+    final participants = [
+      _participantSlot(match.participantA, match),
+      _participantSlot(match.participantB, match),
+    ];
+
+    final slots = <Widget>[];
+
+    for (var index = 0; index < participants.length; index++) {
+      final participant = participants[index];
+      if (participant == null) continue;
+
+      slots.add(
+        Positioned(
+          left: left,
+          right: right,
+          top: top + index * (34 + slotGap),
+          child: _PlayerSlot(
+            participant: participant,
+            alignRight: alignRight,
+            isAdvanced: participant.userId == match.winnerParticipantId,
+            width: compact ? 154 : 178,
+          ),
+        ),
+      );
+    }
+
+    return slots;
+  }
+
+  _BracketParticipant? _participantSlot(
+    PlayoffParticipant? participant,
+    PlayoffMatch match,
+  ) {
+    if (participant == null) {
+      return null;
+    }
+
+    final roundScore =
+        widget.roundScoresByRound[match.round]?[participant.userId]?.points ??
+        0;
+
+    return _BracketParticipant(
+      seed: participant.seed,
+      nick: participant.nick,
+      score: roundScore,
+      userId: participant.userId,
+      isBye: match.isBye &&
+          (match.participantA == null || match.participantB == null),
+    );
+  }
+}
+
+class _RoundSlotSpec {
+  const _RoundSlotSpec({
+    required this.leftX,
+    required this.rightX,
+    required this.leftTops,
+    required this.rightTops,
+  });
+
+  final double leftX;
+  final double rightX;
+  final List<double> leftTops;
+  final List<double> rightTops;
+}
+
+const _roundSpecs = {
+  1: _RoundSlotSpec(
+    leftX: 258,
+    rightX: 258,
+    leftTops: [39, 207, 375, 543],
+    rightTops: [39, 207, 375, 543],
+  ),
+  2: _RoundSlotSpec(
+    leftX: 398,
+    rightX: 398,
+    leftTops: [123, 459],
+    rightTops: [123, 459],
+  ),
+  3: _RoundSlotSpec(
+    leftX: 496,
+    rightX: 496,
+    leftTops: [291],
+    rightTops: [291],
+  ),
+  4: _RoundSlotSpec(
+    leftX: 478,
+    rightX: 478,
+    leftTops: [602],
+    rightTops: [],
+  ),
+};
 
 class _FinalSlot extends StatelessWidget {
   const _FinalSlot();

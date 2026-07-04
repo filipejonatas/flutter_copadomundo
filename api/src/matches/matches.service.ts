@@ -65,6 +65,33 @@ export class MatchesService {
     return this.refreshMatchesCache(url, configuredWcKey, fetchTimeoutMs);
   }
 
+  async refreshWorldCup2026Matches(): Promise<WorldCupMatch[]> {
+    const wcKey = this.configService.get<string>('WC2026_API_KEY');
+    const hasWcKey = this.hasConfiguredKey(wcKey);
+
+    if (!hasWcKey) {
+      if (this.configService.get<string>('NODE_ENV') === 'production') {
+        throw new Error('WC2026_API_KEY precisa estar configurada em producao.');
+      }
+      return this.getMockWorldCup2026Matches();
+    }
+
+    const baseUrl =
+      this.configService.get<string>('WC2026_BASE_URL') ??
+      'https://api.wc2026api.com';
+    const url = new URL('/matches', baseUrl);
+    const fetchTimeoutMs = this.positiveInt(
+      this.configService.get<string>('WC2026_FETCH_TIMEOUT_MS'),
+      7000,
+    );
+
+    return this.fetchAndCacheWc2026Matches(
+      url,
+      this.normalizeKey(wcKey),
+      fetchTimeoutMs,
+    );
+  }
+
   private async refreshMatchesCache(
     url: URL,
     configuredWcKey: string,
