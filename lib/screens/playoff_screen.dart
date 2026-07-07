@@ -248,12 +248,10 @@ class _RulesPanel extends StatelessWidget {
                 'Seed é a posição no ranking geral no fechamento da chave. Se faltar player, os melhores seeds recebem bye e avançam direto.',
           ),
           const _RuleLine(
-            text:
-                'Em empate de pontos no confronto, passa o seed mais alto.',
+            text: 'Em empate de pontos no confronto, passa o seed mais alto.',
           ),
           const _RuleLine(
-            text:
-                'A disputa começa a contar em 28/06, na fase 1/16 da Copa.',
+            text: 'A disputa começa a contar em 28/06, na fase 1/16 da Copa.',
           ),
         ],
       ),
@@ -350,21 +348,22 @@ class _PreviewBracketState extends State<_PreviewBracket> {
   @override
   Widget build(BuildContext context) {
     final participantBySeed = {
-      for (final participant in widget.participants) participant.seed: participant,
+      for (final participant in widget.participants)
+        participant.seed: participant,
     };
     final firstRound = _PreviewBracket.seedOrder
         .map(
           (seed) =>
-              participantBySeed[seed] ??
-              _BracketParticipant.bye(seed: seed),
+              participantBySeed[seed] ?? _BracketParticipant.bye(seed: seed),
         )
         .toList();
 
     return LayoutBuilder(
       builder: (context, constraints) {
         final viewportContentWidth = constraints.maxWidth - 28;
-        final bracketViewportWidth =
-            viewportContentWidth > 1120 ? viewportContentWidth : 1120.0;
+        final bracketViewportWidth = viewportContentWidth > 1120
+            ? viewportContentWidth
+            : 1120.0;
 
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (!_didCenterBracket && _scrollController.hasClients) {
@@ -394,9 +393,7 @@ class _PreviewBracketState extends State<_PreviewBracket> {
                     child: Stack(
                       children: [
                         Positioned.fill(
-                          child: CustomPaint(
-                            painter: _BracketLinesPainter(),
-                          ),
+                          child: CustomPaint(painter: _BracketLinesPainter()),
                         ),
                         Positioned(
                           top: 22,
@@ -431,7 +428,8 @@ class _PreviewBracketState extends State<_PreviewBracket> {
     final slots = <Widget>[];
 
     for (var index = 0; index < 16; index++) {
-      final isByeWin = index.isEven && firstRound[index + 1].isBye ||
+      final isByeWin =
+          index.isEven && firstRound[index + 1].isBye ||
           index.isOdd && firstRound[index - 1].isBye;
       slots.add(
         Positioned(
@@ -447,7 +445,8 @@ class _PreviewBracketState extends State<_PreviewBracket> {
 
     for (var index = 16; index < 32; index++) {
       final localIndex = index - 16;
-      final isByeWin = localIndex.isEven && firstRound[index + 1].isBye ||
+      final isByeWin =
+          localIndex.isEven && firstRound[index + 1].isBye ||
           localIndex.isOdd && firstRound[index - 1].isBye;
       slots.add(
         Positioned(
@@ -476,12 +475,7 @@ class _BracketParticipant {
   });
 
   factory _BracketParticipant.bye({required int seed}) {
-    return _BracketParticipant(
-      seed: seed,
-      nick: 'BYE',
-      score: 0,
-      isBye: true,
-    );
+    return _BracketParticipant(seed: seed, nick: 'BYE', score: 0, isBye: true);
   }
 
   final int seed;
@@ -605,8 +599,9 @@ class _OfficialBracketState extends State<_OfficialBracket> {
     return LayoutBuilder(
       builder: (context, constraints) {
         final viewportContentWidth = constraints.maxWidth - 28;
-        final bracketViewportWidth =
-            viewportContentWidth > 1120 ? viewportContentWidth : 1120.0;
+        final bracketViewportWidth = viewportContentWidth > 1120
+            ? viewportContentWidth
+            : 1120.0;
 
         return ClipRRect(
           borderRadius: BorderRadius.circular(AppRadii.card),
@@ -626,16 +621,15 @@ class _OfficialBracketState extends State<_OfficialBracket> {
                     child: Stack(
                       children: [
                         Positioned.fill(
-                          child: CustomPaint(
-                            painter: _BracketLinesPainter(),
-                          ),
+                          child: CustomPaint(painter: _BracketLinesPainter()),
                         ),
                         Positioned(
                           top: 22,
                           left: 428,
                           right: 428,
                           child: _CenterBadge(
-                            participantsCount: widget.bracket.participants.length,
+                            participantsCount:
+                                widget.bracket.participants.length,
                           ),
                         ),
                         ..._officialSlots(),
@@ -851,7 +845,8 @@ class _OfficialBracketState extends State<_OfficialBracket> {
       nick: participant.nick,
       score: roundScore,
       userId: participant.userId,
-      isBye: match.isBye &&
+      isBye:
+          match.isBye &&
           (match.participantA == null || match.participantB == null),
     );
   }
@@ -879,23 +874,13 @@ const _roundSpecs = {
     rightTops: [39, 207, 375, 543],
   ),
   2: _RoundSlotSpec(
-    leftX: 398,
-    rightX: 398,
+    leftX: 318,
+    rightX: 318,
     leftTops: [123, 459],
     rightTops: [123, 459],
   ),
-  3: _RoundSlotSpec(
-    leftX: 496,
-    rightX: 496,
-    leftTops: [291],
-    rightTops: [291],
-  ),
-  4: _RoundSlotSpec(
-    leftX: 478,
-    rightX: 478,
-    leftTops: [602],
-    rightTops: [],
-  ),
+  3: _RoundSlotSpec(leftX: 340, rightX: 340, leftTops: [291], rightTops: [291]),
+  4: _RoundSlotSpec(leftX: 478, rightX: 478, leftTops: [602], rightTops: []),
 };
 
 class _FinalSlot extends StatelessWidget {
@@ -910,7 +895,9 @@ class _FinalSlot extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.primaryAccent.withValues(alpha: .12),
         borderRadius: BorderRadius.circular(AppRadii.pill),
-        border: Border.all(color: AppColors.primaryAccent.withValues(alpha: .45)),
+        border: Border.all(
+          color: AppColors.primaryAccent.withValues(alpha: .45),
+        ),
       ),
       child: const Text(
         'FINAL',
