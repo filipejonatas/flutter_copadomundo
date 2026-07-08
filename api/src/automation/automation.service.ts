@@ -105,7 +105,7 @@ export class AutomationService {
     ) {
       const advancedBracket = await this.playoffsService.advanceCurrentRound({
         round: currentRound,
-      });
+      }, matches);
       bracketAdvanced = true;
       nextRound = this.playoffsService.getCurrentPendingRound(advancedBracket);
     }
@@ -177,7 +177,7 @@ export class AutomationService {
   }
 
   private booleanRecord(value: unknown): Record<string, boolean> {
-    if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+    if (!value || typeof value !== 'object') return {};
     return Object.fromEntries(
       Object.entries(value as Record<string, unknown>)
         .filter(([, item]) => item === true)

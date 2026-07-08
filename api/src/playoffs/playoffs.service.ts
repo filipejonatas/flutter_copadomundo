@@ -67,6 +67,7 @@ export class PlayoffsService {
 
   async advanceCurrentRound(
     body: AdvancePlayoffRoundBody = {},
+    matchesOverride?: WorldCupMatch[],
   ): Promise<PlayoffBracket> {
     if (!this.isPlayoffActive()) {
       throw new Error('Mata-mata ainda nao esta ativo.');
@@ -86,10 +87,10 @@ export class PlayoffsService {
     }
 
     if (!force) {
-      await this.assertRoundFinished(round);
+      await this.assertRoundFinished(round, matchesOverride);
     }
 
-    const scores = await this.calculateRoundScore(round);
+    const scores = await this.calculateRoundScore(round, matchesOverride);
     const scoresByUserId = new Map(
       scores.map((score) => [score.userId, { points: score.points }]),
     );
@@ -157,7 +158,10 @@ export class PlayoffsService {
     return advancedBracket;
   }
 
-  async calculateRoundScore(round: string): Promise<PlayoffRoundScore[]> {
+  async calculateRoundScore(
+    round: string,
+    matchesOverride?: WorldCupMatch[],
+  ): Promise<PlayoffRoundScore[]> {
     if (!this.isPlayoffActive()) return [];
 
     const bracket = await this.getCurrentBracket();
@@ -167,7 +171,8 @@ export class PlayoffsService {
         participant,
       ]),
     );
-    const matches = await this.matchesService.getWorldCup2026Matches();
+    const matches =
+      matchesOverride ?? (await this.matchesService.getWorldCup2026Matches());
     const finishedRoundMatches = Object.fromEntries(
       matches
         .filter(
@@ -402,8 +407,12 @@ export class PlayoffsService {
       : match.participantB;
   }
 
-  private async assertRoundFinished(round: string): Promise<void> {
-    const matches = await this.matchesService.getWorldCup2026Matches();
+  private async assertRoundFinished(
+    round: string,
+    matchesOverride?: WorldCupMatch[],
+  ): Promise<void> {
+    const matches =
+      matchesOverride ?? (await this.matchesService.getWorldCup2026Matches());
     const playoffRoundMatches = matches.filter(
       (match) => this.sameRound(match.round, round) && this.isPlayoffMatch(match),
     );
