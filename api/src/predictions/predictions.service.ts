@@ -62,9 +62,6 @@ export interface MatchPredictionResultsResponse {
 export class PredictionsService {
   static readonly groupPointsPerExactScore = 5;
   static readonly groupPointsPerCorrectPick = 3;
-  static readonly playoffPointsPerExactScore = 10;
-  static readonly playoffPointsPerCorrectDifference = 7;
-  static readonly playoffPointsPerQualified = 5;
 
   constructor(
     private readonly firebaseAdmin: FirebaseAdminService,
@@ -321,9 +318,10 @@ export class PredictionsService {
     const exactScore =
       prediction.homeScore === match.homeScore &&
       prediction.awayScore === match.awayScore;
+    const points = PredictionsService.playoffPointValues(match);
     if (exactScore) {
       return {
-        points: PredictionsService.playoffPointsPerExactScore,
+        points: points.exactScore,
         exactScore,
         correctPick,
       };
@@ -333,17 +331,44 @@ export class PredictionsService {
     const actualDifference = match.homeScore - match.awayScore;
     if (predictedDifference === actualDifference) {
       return {
-        points: PredictionsService.playoffPointsPerCorrectDifference,
+        points: points.correctDifference,
         exactScore,
         correctPick,
       };
     }
 
     return {
-      points: PredictionsService.playoffPointsPerQualified,
+      points: points.qualified,
       exactScore,
       correctPick,
     };
+  }
+
+  private static playoffPointValues(match: WorldCupMatch): {
+    exactScore: number;
+    correctDifference: number;
+    qualified: number;
+  } {
+    const normalized = match.round.trim().toUpperCase().replace(/[\s-]+/g, '_');
+    if (['SF', 'SEMI', 'SEMI_FINAL', 'SEMI_FINALS', 'SEMIS'].includes(normalized)) {
+      return { exactScore: 20, correctDifference: 14, qualified: 10 };
+    }
+    if (
+      [
+        'THIRD_PLACE',
+        'THIRD_PLACE_MATCH',
+        '3RD_PLACE',
+        '3RD_PLACE_MATCH',
+        'TERCEIRO_LUGAR',
+        'DISPUTA_DE_TERCEIRO',
+      ].includes(normalized)
+    ) {
+      return { exactScore: 25, correctDifference: 18, qualified: 13 };
+    }
+    if (['F', 'FINAL'].includes(normalized)) {
+      return { exactScore: 30, correctDifference: 21, qualified: 15 };
+    }
+    return { exactScore: 10, correctDifference: 7, qualified: 5 };
   }
 
   private isFinished(match: WorldCupMatch): boolean {

@@ -238,9 +238,11 @@ class _RulesPanel extends StatelessWidget {
         children: [
           Text('Pontuação do mata-mata', style: theme.textTheme.titleMedium),
           const SizedBox(height: 10),
-          const _RuleLine(text: 'Classificado correto: 5 pts'),
-          const _RuleLine(text: 'Classificado + diferença de gols: 7 pts'),
-          const _RuleLine(text: 'Classificado + placar exato: 10 pts'),
+          const _RuleLine(text: 'Base: 5 / 7 / 10 pts'),
+          const _RuleLine(text: 'Semifinal: 10 / 14 / 20 pts'),
+          const _RuleLine(
+            text: 'Terceiro: 13 / 18 / 25 pts; final: 15 / 21 / 30 pts',
+          ),
           const SizedBox(height: 10),
           Divider(color: Colors.white.withValues(alpha: .08), height: 18),
           const _RuleLine(

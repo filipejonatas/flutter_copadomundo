@@ -81,6 +81,77 @@ test('calculatePredictionPoints accepts qualifiedPick for tied knockout guesses'
   );
 });
 
+test('calculatePredictionPoints increases points for semi, third place, and final', () => {
+  const phaseMatch = (round: string): WorldCupMatch => ({
+    ...finishedMatch,
+    round,
+  });
+
+  assert.equal(
+    PlayoffsService.calculatePredictionPoints(
+      prediction(2, 1, 'home'),
+      phaseMatch('Semi Final'),
+    ),
+    20,
+  );
+  assert.equal(
+    PlayoffsService.calculatePredictionPoints(
+      prediction(1, 0, 'home'),
+      phaseMatch('Semi Final'),
+    ),
+    14,
+  );
+  assert.equal(
+    PlayoffsService.calculatePredictionPoints(
+      prediction(3, 1, 'home'),
+      phaseMatch('Semi Final'),
+    ),
+    10,
+  );
+  assert.equal(
+    PlayoffsService.calculatePredictionPoints(
+      prediction(2, 1, 'home'),
+      phaseMatch('Third Place'),
+    ),
+    25,
+  );
+  assert.equal(
+    PlayoffsService.calculatePredictionPoints(
+      prediction(1, 0, 'home'),
+      phaseMatch('Third Place'),
+    ),
+    18,
+  );
+  assert.equal(
+    PlayoffsService.calculatePredictionPoints(
+      prediction(3, 1, 'home'),
+      phaseMatch('Third Place'),
+    ),
+    13,
+  );
+  assert.equal(
+    PlayoffsService.calculatePredictionPoints(
+      prediction(2, 1, 'home'),
+      phaseMatch('Final'),
+    ),
+    30,
+  );
+  assert.equal(
+    PlayoffsService.calculatePredictionPoints(
+      prediction(1, 0, 'home'),
+      phaseMatch('Final'),
+    ),
+    21,
+  );
+  assert.equal(
+    PlayoffsService.calculatePredictionPoints(
+      prediction(3, 1, 'home'),
+      phaseMatch('Final'),
+    ),
+    15,
+  );
+});
+
 test('withInferredQualifiedPicks derives tied knockout winner from next round', () => {
   const matches = MatchesService.withInferredQualifiedPicks([
     {

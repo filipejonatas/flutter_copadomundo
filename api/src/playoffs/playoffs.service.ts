@@ -380,13 +380,14 @@ export class PlayoffsService {
     const exactScore =
       prediction.homeScore === match.homeScore &&
       prediction.awayScore === match.awayScore;
-    if (exactScore) return 10;
+    const points = PlayoffsService.predictionPointValues(match);
+    if (exactScore) return points.exactScore;
 
     const predictedDifference = prediction.homeScore - prediction.awayScore;
     const actualDifference = match.homeScore - match.awayScore;
-    if (predictedDifference === actualDifference) return 7;
+    if (predictedDifference === actualDifference) return points.correctDifference;
 
-    return 5;
+    return points.qualified;
   }
 
   static resolveMatchWinner(
@@ -496,7 +497,11 @@ export class PlayoffsService {
       matchPoints[fixtureId] = scoredPoints;
 
       if (scoredPoints > 0) correctQualified++;
-      if (scoredPoints === 10) exactScores++;
+      if (
+        scoredPoints === PlayoffsService.predictionPointValues(match).exactScore
+      ) {
+        exactScores++;
+      }
     }
 
     return {
@@ -586,6 +591,33 @@ export class PlayoffsService {
     }
     if (['F', 'FINAL'].includes(normalized)) return 'final';
     return normalized.toLowerCase();
+  }
+
+  private static predictionPointValues(match: WorldCupMatch): {
+    exactScore: number;
+    correctDifference: number;
+    qualified: number;
+  } {
+    const normalized = match.round.trim().toUpperCase().replace(/[\s-]+/g, '_');
+    if (['SF', 'SEMI', 'SEMI_FINAL', 'SEMI_FINALS', 'SEMIS'].includes(normalized)) {
+      return { exactScore: 20, correctDifference: 14, qualified: 10 };
+    }
+    if (
+      [
+        'THIRD_PLACE',
+        'THIRD_PLACE_MATCH',
+        '3RD_PLACE',
+        '3RD_PLACE_MATCH',
+        'TERCEIRO_LUGAR',
+        'DISPUTA_DE_TERCEIRO',
+      ].includes(normalized)
+    ) {
+      return { exactScore: 25, correctDifference: 18, qualified: 13 };
+    }
+    if (['F', 'FINAL'].includes(normalized)) {
+      return { exactScore: 30, correctDifference: 21, qualified: 15 };
+    }
+    return { exactScore: 10, correctDifference: 7, qualified: 5 };
   }
 
   private isPlayoffActive(now = new Date()): boolean {
