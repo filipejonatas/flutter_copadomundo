@@ -764,8 +764,8 @@ class _OfficialBracketState extends State<_OfficialBracket> {
     if (leftParticipant != null) {
       slots.add(
         Positioned(
-          left: 360,
-          top: 330,
+          left: 488,
+          top: 278,
           child: _PlayerSlot(
             participant: leftParticipant,
             isAdvanced: leftParticipant.userId == match.winnerParticipantId,
@@ -777,11 +777,10 @@ class _OfficialBracketState extends State<_OfficialBracket> {
     if (rightParticipant != null) {
       slots.add(
         Positioned(
-          right: 360,
-          top: 330,
+          left: 488,
+          top: 382,
           child: _PlayerSlot(
             participant: rightParticipant,
-            alignRight: true,
             isAdvanced: rightParticipant.userId == match.winnerParticipantId,
             width: 144,
           ),
@@ -958,6 +957,8 @@ class _BracketLinesPainter extends CustomPainter {
     _drawSide(canvas, paint, isLeft: false);
 
     canvas.drawLine(const Offset(514, 347), const Offset(606, 347), paint);
+    canvas.drawLine(const Offset(560, 312), const Offset(560, 330), paint);
+    canvas.drawLine(const Offset(560, 364), const Offset(560, 382), paint);
   }
 
   void _drawSide(Canvas canvas, Paint paint, {required bool isLeft}) {
